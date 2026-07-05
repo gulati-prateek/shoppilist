@@ -2,6 +2,7 @@
 
 package com.shoppilist.shared.data.repository
 
+import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.*
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
@@ -62,7 +63,7 @@ class RoomPresenceRepository(private val presenceDao: PresenceDao) : PresenceRep
 
     override suspend fun markActive(listId: String, userId: String): Result<Unit> {
         return try {
-            presenceDao.upsert(PresenceEntity(listId, userId, System.currentTimeMillis()))
+            presenceDao.upsert(PresenceEntity(listId, userId, currentTimeMillis()))
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -100,7 +101,7 @@ class RoomInvitationRepository(
     ): Result<InvitationEntity> {
         return try {
             val sevenDaysMillis = 7L * 24 * 60 * 60 * 1000
-            val expires = System.currentTimeMillis() + sevenDaysMillis
+            val expires = currentTimeMillis() + sevenDaysMillis
             val invite = InvitationEntity(
                 inviteId = Uuid.random().toString(),
                 listId = listId,

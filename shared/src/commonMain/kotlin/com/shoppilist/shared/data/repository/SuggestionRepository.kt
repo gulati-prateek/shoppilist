@@ -2,6 +2,7 @@
 
 package com.shoppilist.shared.data.repository
 
+import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.GlobalItemDao
 import com.shoppilist.shared.data.local.GlobalItemEntity
 import com.shoppilist.shared.data.local.ItemHistoryDao
@@ -38,7 +39,7 @@ class RoomSuggestionRepository(
                 itemName = normalized,
                 listId = listId,
                 addedCount = (existing?.addedCount ?: 0) + 1,
-                lastAddedAt = System.currentTimeMillis()
+                lastAddedAt = currentTimeMillis()
             )
         )
     }
@@ -61,7 +62,7 @@ class RoomSuggestionRepository(
                 userId = userId,
                 itemName = normalized,
                 dismissCount = (existing?.dismissCount ?: 0) + 1,
-                lastDismissedAt = System.currentTimeMillis()
+                lastDismissedAt = currentTimeMillis()
             )
         )
     }

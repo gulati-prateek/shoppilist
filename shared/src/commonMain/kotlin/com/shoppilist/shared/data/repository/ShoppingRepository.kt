@@ -2,6 +2,7 @@
 
 package com.shoppilist.shared.data.repository
 
+import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -193,7 +194,7 @@ class RoomShoppingItemRepository(
 
     override suspend fun assignItem(itemId: String, userId: String, assignedBy: String): Result<Unit> {
         return try {
-            itemDao.assignItem(itemId, userId, assignedBy, System.currentTimeMillis())
+            itemDao.assignItem(itemId, userId, assignedBy, currentTimeMillis())
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -3,6 +3,7 @@
 package com.shoppilist.shared.data.local
 
 import androidx.room.*
+import com.shoppilist.shared.currentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -56,7 +57,7 @@ data class UserEntity(
     val languageCode: String? = null,
     val hideSponsoredLinks: Boolean = false,
     val groceryCardDismissed: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(tableName = "households")
@@ -65,7 +66,7 @@ data class HouseholdEntity(
     val name: String,
     val description: String?,
     val ownerId: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(
@@ -77,7 +78,7 @@ data class HouseholdMemberEntity(
     val householdId: String,
     val userId: String,
     val role: MemberRole = MemberRole.MEMBER,
-    val joinedAt: Long = System.currentTimeMillis()
+    val joinedAt: Long = currentTimeMillis()
 )
 
 /** Per-list membership/role — the real collaboration model (§2.5). */
@@ -90,7 +91,7 @@ data class ListMemberEntity(
     val listId: String,
     val userId: String,
     val role: ListRole = ListRole.EDITOR,
-    val joinedAt: Long = System.currentTimeMillis()
+    val joinedAt: Long = currentTimeMillis()
 )
 
 @Entity(
@@ -108,7 +109,7 @@ data class ShoppingListEntity(
     val isFavorite: Boolean = false,
     val pinned: Boolean = false,
     val archived: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(
@@ -133,7 +134,7 @@ data class ShoppingItemEntity(
     val assignedBy: String? = null,
     val assignedAt: Long? = null,
     val sortOrder: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 /** Supermarket-aisle taxonomy (§2.12). `listId = null` rows are global/shared; a non-null
@@ -160,7 +161,7 @@ data class CategoryCorrectionEntity(
     val suggestedCategoryId: String?,
     val correctCategoryId: String,
     val correctedBy: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 /** Curated global item database (§2.9) — a representative seed, not the full 5,000+ catalog. */
@@ -186,7 +187,7 @@ data class ItemHistoryEntity(
     val itemName: String,
     val listId: String,
     val addedCount: Int = 1,
-    val lastAddedAt: Long = System.currentTimeMillis()
+    val lastAddedAt: Long = currentTimeMillis()
 )
 
 /** Tracks dismissed suggestions per user so they rank lower next time (§2.8). */
@@ -199,7 +200,7 @@ data class SuggestionDismissalEntity(
     val userId: String,
     val itemName: String,
     val dismissCount: Int = 1,
-    val lastDismissedAt: Long = System.currentTimeMillis()
+    val lastDismissedAt: Long = currentTimeMillis()
 )
 
 /** Local grocery delivery app recommendations per country (§2.10). */
@@ -243,7 +244,7 @@ data class SponsoredClickEntity(
     val listId: String? = null,
     val clickType: String,
     val countryCode: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 /** Lightweight "X is shopping now" presence (§2.5) — local mirror of the sample Firestore broadcast. */
@@ -251,7 +252,7 @@ data class SponsoredClickEntity(
 data class PresenceEntity(
     val listId: String,
     val userId: String,
-    val lastActiveAt: Long = System.currentTimeMillis()
+    val lastActiveAt: Long = currentTimeMillis()
 )
 
 @Entity(tableName = "invitations", indices = [Index("listId"), Index("token")])
@@ -266,7 +267,7 @@ data class InvitationEntity(
     val token: String = Uuid.random().toString(),
     val status: String = "PENDING",
     val expiresAt: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(tableName = "notifications")
@@ -277,7 +278,7 @@ data class NotificationEntity(
     val body: String,
     val dataPayload: String?,
     val seen: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(tableName = "voice_command_history")
@@ -286,7 +287,7 @@ data class VoiceCommandHistoryEntity(
     val userId: String,
     val rawText: String,
     val intentType: String?,
-    val processedAt: Long = System.currentTimeMillis(),
+    val processedAt: Long = currentTimeMillis(),
     val success: Boolean = false,
     val errorMessage: String? = null
 )
@@ -298,7 +299,7 @@ data class AffiliateClickEntity(
     val platform: String,
     val affiliateUrl: String,
     val attributed: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )
 
 @Entity(tableName = "pending_ops")
@@ -308,8 +309,8 @@ data class PendingOpEntity(
     val targetId: String, // listId or itemId
     val payload: String, // JSON serialized
     val status: String = "PENDING", // PENDING, SYNCED, FAILED
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis(),
+    val updatedAt: Long = currentTimeMillis()
 )
 
 @Dao
@@ -629,7 +630,7 @@ interface PendingOpDao {
     suspend fun insert(op: PendingOpEntity)
 
     @Query("UPDATE pending_ops SET status = :status, updatedAt = :now WHERE opId = :opId")
-    suspend fun updateStatus(opId: String, status: String, now: Long = System.currentTimeMillis())
+    suspend fun updateStatus(opId: String, status: String, now: Long = currentTimeMillis())
 
     @Query("DELETE FROM pending_ops WHERE opId = :opId")
     suspend fun delete(opId: String)
