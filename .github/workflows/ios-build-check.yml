@@ -1,0 +1,36 @@
+name: iOS build check
+
+# Minimal proof-of-life for the Kotlin Multiplatform migration: this only builds the
+# :shared module's Kotlin/Native iOS targets (no app UI yet — that's Phase 5+ of the
+# migration). It exists because iOS targets are hard-disabled on any non-macOS host
+# (see the "Disabled Kotlin/Native Targets" warning on Windows/Linux), so this is the
+# first point in the project where iOS compilation gets checked at all.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-shared-ios-targets:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Windows doesn't preserve the Unix executable bit, and this repo was authored on Windows.
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Compile :shared for all iOS targets
+        run: |
+          ./gradlew \
+            :shared:compileKotlinIosArm64 \
+            :shared:compileKotlinIosSimulatorArm64 \
+            :shared:compileKotlinIosX64 \
+            --stacktrace
