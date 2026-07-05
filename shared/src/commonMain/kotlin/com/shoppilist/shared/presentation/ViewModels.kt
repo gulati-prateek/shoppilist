@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
@@ -10,7 +12,7 @@ import com.shoppilist.shared.domain.*
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 class AuthViewModel(
     private val userDao: UserDao,
@@ -25,7 +27,7 @@ class AuthViewModel(
 
             val pendingLocale = sessionManager.consumePendingLocale()
             val base = existing ?: UserEntity(
-                userId = UUID.randomUUID().toString(),
+                userId = Uuid.random().toString(),
                 fullName = fullName?.takeIf { it.isNotBlank() } ?: email ?: phone ?: "You",
                 phone = phone?.takeIf { it.isNotBlank() },
                 email = email?.takeIf { it.isNotBlank() },
