@@ -1,9 +1,14 @@
 package com.shoppilist.shared.sync
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import platform.BackgroundTasks.BGAppRefreshTaskRequest
 import platform.BackgroundTasks.BGTaskScheduler
 import platform.Foundation.NSDate
+import platform.Foundation.NSError
 import platform.Foundation.dateByAddingTimeInterval
 
 private const val TASK_IDENTIFIER = "com.shoppilist.proactiveSuggestions"
@@ -22,10 +27,11 @@ class IosProactiveSuggestionScheduler : ProactiveSuggestionScheduler {
     override fun schedule() {
         val request = BGAppRefreshTaskRequest(TASK_IDENTIFIER)
         request.earliestBeginDate = NSDate().dateByAddingTimeInterval(ONE_DAY_SECONDS)
-        try {
-            BGTaskScheduler.sharedScheduler.submitTaskRequest(request)
-        } catch (e: Exception) {
-            // No registered handler for TASK_IDENTIFIER yet (see class doc) -- ignore until Phase 6.
+        memScoped {
+            val errorVar = alloc<ObjCObjectVar<NSError?>>()
+            val submitted = BGTaskScheduler.sharedScheduler.submitTaskRequest(request, errorVar.ptr)
+            // Fails with an error until TASK_IDENTIFIER is registered (see class doc) -- ignore until Phase 6.
+            if (!submitted) return@memScoped
         }
     }
 }
