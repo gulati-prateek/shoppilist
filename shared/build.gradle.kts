@@ -51,8 +51,8 @@ kotlin {
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.2")
 
             // Koin's Compose Multiplatform integration (koin-androidx-compose is Android-only)
-            implementation("io.insert-koin:koin-compose:4.2.2")
-            implementation("io.insert-koin:koin-compose-viewmodel:4.2.2")
+            implementation("io.insert-koin:koin-compose:4.0.0")
+            implementation("io.insert-koin:koin-compose-viewmodel:4.0.0")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

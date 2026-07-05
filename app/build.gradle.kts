@@ -86,7 +86,7 @@ dependencies {
 
     // Koin (DI) — koin-androidx-compose is no longer needed here: all Composables/koinViewModel()
     // calls now live in :shared, using the multiplatform koin-compose/koin-compose-viewmodel there.
-    implementation("io.insert-koin:koin-android:4.2.2")
+    implementation("io.insert-koin:koin-android:4.0.0")
 
     // Room — entities/DAOs/@Database now live in :shared (KSP codegen runs there); :app only
     // needs the runtime to call Room.databaseBuilder(...) with the Android Context.
