@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.shoppilist.ui.screens
+package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,17 +24,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import com.shoppilist.shared.presentation.HomeViewModel
 import com.shoppilist.shared.presentation.ListMeta
 
 private val PRESET_LIST_COLORS = listOf("#2ECC71", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280")
 
-private fun colorFromHex(hex: String?): Color? = try {
-    hex?.takeIf { it.isNotBlank() }?.let { Color(android.graphics.Color.parseColor(it)) }
-} catch (e: Exception) {
-    null
+// android.graphics.Color.parseColor has no Kotlin/Native equivalent, so hex parsing is hand-rolled.
+private fun colorFromHex(hex: String?): Color? {
+    val cleaned = hex?.takeIf { it.isNotBlank() }?.removePrefix("#") ?: return null
+    return try {
+        val argb = when (cleaned.length) {
+            6 -> (0xFF000000L or cleaned.toLong(16))
+            8 -> cleaned.toLong(16)
+            else -> return null
+        }
+        Color(argb.toInt())
+    } catch (e: NumberFormatException) {
+        null
+    }
 }
 
 @Composable

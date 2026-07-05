@@ -1,4 +1,4 @@
-package com.shoppilist.ui.screens
+package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,19 +10,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
-import com.shoppilist.R
+import org.koin.compose.viewmodel.koinViewModel
+import com.shoppilist.shared.resources.*
 import com.shoppilist.shared.data.local.ListRole
 import com.shoppilist.shared.presentation.InviteViewModel
 
 @Composable
 private fun roleLabel(role: ListRole): String = when (role) {
-    ListRole.OWNER -> stringResource(R.string.role_owner)
-    ListRole.EDITOR -> stringResource(R.string.role_editor)
-    ListRole.VIEWER -> stringResource(R.string.role_viewer)
+    ListRole.OWNER -> stringResource(Res.string.role_owner)
+    ListRole.EDITOR -> stringResource(Res.string.role_editor)
+    ListRole.VIEWER -> stringResource(Res.string.role_viewer)
 }
 
 /** Invite / member management screen (§2.5). */
@@ -45,7 +45,7 @@ fun InviteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.title_invite)) },
+                title = { Text(stringResource(Res.string.title_invite)) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }
             )
         }
@@ -62,7 +62,7 @@ fun InviteScreen(
                     contact = it
                     channel = if (it.contains("@")) "email" else "phone"
                 },
-                label = { Text(stringResource(R.string.label_email_or_phone)) },
+                label = { Text(stringResource(Res.string.label_email_or_phone)) },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -72,7 +72,7 @@ fun InviteScreen(
                     value = roleLabel(role),
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(stringResource(R.string.label_role)) },
+                    label = { Text(stringResource(Res.string.label_role)) },
                     modifier = Modifier
                         .menuAnchor()
                         .fillMaxWidth()
@@ -93,14 +93,14 @@ fun InviteScreen(
                 enabled = contact.isNotBlank(),
                 modifier = Modifier.align(Alignment.End)
             ) {
-                Text(stringResource(R.string.action_send_invite))
+                Text(stringResource(Res.string.action_send_invite))
             }
 
             state.lastInviteLink?.let { link ->
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Or share link: $link", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { clipboard.setText(AnnotatedString(link)) }) { Text(stringResource(R.string.action_copy)) }
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(link)) }) { Text(stringResource(Res.string.action_copy)) }
                 }
             }
             state.error?.let {
@@ -109,7 +109,7 @@ fun InviteScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            Text(stringResource(R.string.title_members), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.title_members), style = MaterialTheme.typography.titleMedium)
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(state.members) { member ->
                     ListItem(
@@ -117,7 +117,7 @@ fun InviteScreen(
                         supportingContent = { Text(roleLabel(member.role)) },
                         trailingContent = {
                             if (member.role != ListRole.OWNER) {
-                                TextButton(onClick = { viewModel.removeMember(listId, member.userId) }) { Text(stringResource(R.string.action_remove)) }
+                                TextButton(onClick = { viewModel.removeMember(listId, member.userId) }) { Text(stringResource(Res.string.action_remove)) }
                             }
                         }
                     )

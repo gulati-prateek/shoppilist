@@ -19,12 +19,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.shoppilist"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.shoppilist"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -78,18 +78,15 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.7.0")
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
 
-    // Koin (DI)
-    implementation("io.insert-koin:koin-android:3.5.6")
-    implementation("io.insert-koin:koin-androidx-compose:3.5.6")
+    // Koin (DI) — koin-androidx-compose is no longer needed here: all Composables/koinViewModel()
+    // calls now live in :shared, using the multiplatform koin-compose/koin-compose-viewmodel there.
+    implementation("io.insert-koin:koin-android:4.2.2")
 
     // Room — entities/DAOs/@Database now live in :shared (KSP codegen runs there); :app only
     // needs the runtime to call Room.databaseBuilder(...) with the Android Context.

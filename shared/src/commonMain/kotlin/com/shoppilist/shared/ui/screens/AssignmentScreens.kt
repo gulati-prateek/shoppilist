@@ -1,4 +1,4 @@
-package com.shoppilist.ui.screens
+package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,12 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
-import com.shoppilist.R
+import org.koin.compose.viewmodel.koinViewModel
+import com.shoppilist.shared.resources.*
 import com.shoppilist.shared.presentation.AssignmentsViewModel
 
 /** "Who's Getting What" panel (§2.11). */
@@ -31,7 +31,7 @@ fun AssignmentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.title_whos_getting_what)) },
+                title = { Text(stringResource(Res.string.title_whos_getting_what)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 }
@@ -68,7 +68,7 @@ fun AssignmentsScreen(
             if (state.unassigned.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.padding(vertical = 12.dp)) {
-                        Text(stringResource(R.string.label_unassigned), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(Res.string.label_unassigned), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                         Text(
                             "${state.unassigned.size} items",
                             style = MaterialTheme.typography.bodyMedium,
@@ -88,7 +88,7 @@ fun AssignmentsScreen(
             if (state.byAssignee.isEmpty() && state.unassigned.isEmpty()) {
                 item {
                     Text(
-                        stringResource(R.string.empty_no_items),
+                        stringResource(Res.string.empty_no_items),
                         modifier = Modifier.padding(vertical = 24.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

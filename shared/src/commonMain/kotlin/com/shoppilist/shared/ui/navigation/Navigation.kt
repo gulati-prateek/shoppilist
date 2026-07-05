@@ -1,4 +1,4 @@
-package com.shoppilist.ui.navigation
+package com.shoppilist.shared.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
@@ -6,7 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.shoppilist.shared.domain.CountryLanguageData
-import com.shoppilist.ui.screens.*
+import com.shoppilist.shared.ui.screens.*
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")

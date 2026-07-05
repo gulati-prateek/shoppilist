@@ -1,4 +1,4 @@
-package com.shoppilist.ui.screens
+package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

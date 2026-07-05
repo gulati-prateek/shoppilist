@@ -1,14 +1,5 @@
-package com.shoppilist.ui.screens
+package com.shoppilist.shared.ui.screens
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,12 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.presentation.AuthViewModel
 import com.shoppilist.shared.presentation.ListDetailViewModel
+import com.shoppilist.shared.voice.rememberVoiceInputController
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
@@ -173,63 +163,29 @@ fun AddItemScreen(listId: String, viewModel: ListDetailViewModel = koinViewModel
 }
 
 @Composable
-fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.shared.presentation.VoiceViewModel = org.koin.androidx.compose.koinViewModel()) {
+fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.shared.presentation.VoiceViewModel = koinViewModel()) {
     val input by viewModel.inputText.collectAsState()
     val result by viewModel.result.collectAsState()
-    val context = LocalContext.current
 
     var isListening by remember { mutableStateOf(false) }
     var speechError by remember { mutableStateOf<String?>(null) }
-    val speechRecognizer = remember {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) SpeechRecognizer.createSpeechRecognizer(context) else null
-    }
+
+    val voiceInput = rememberVoiceInputController(
+        onResult = { text ->
+            viewModel.updateInput(text)
+            viewModel.processText(text)
+        },
+        onListeningChanged = { isListening = it },
+        onError = { speechError = it }
+    )
 
     DisposableEffect(Unit) {
-        onDispose { speechRecognizer?.destroy() }
-    }
-
-    fun startListening() {
-        val recognizer = speechRecognizer
-        if (recognizer == null) {
-            speechError = "Speech recognition isn't available on this device"
-            return
-        }
-        speechError = null
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-        }
-        recognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) { isListening = true }
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() { isListening = false }
-            override fun onError(error: Int) {
-                isListening = false
-                speechError = "Didn't catch that, try again"
-            }
-            override fun onResults(results: Bundle?) {
-                isListening = false
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!text.isNullOrBlank()) {
-                    viewModel.updateInput(text)
-                    viewModel.processText(text)
-                }
-            }
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-        recognizer.startListening(intent)
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startListening() else speechError = "Microphone permission is needed for voice input"
+        onDispose { voiceInput.destroy() }
     }
 
     fun onMicTapped() {
-        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (hasPermission) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        speechError = null
+        voiceInput.startListening()
     }
 
     Column(

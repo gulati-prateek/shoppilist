@@ -38,6 +38,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
+            implementation(compose.materialIconsExtended)
 
             // KMP-compatible ViewModel (androidx.lifecycle.ViewModel doesn't exist outside Android)
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
@@ -45,6 +46,13 @@ kotlin {
             // KMP-portable key-value storage backing SessionManager (SharedPreferences on Android
             // has no Kotlin/Native equivalent; this wraps SharedPreferences/NSUserDefaults per platform)
             implementation("com.russhwolf:multiplatform-settings:1.1.1")
+
+            // KMP Navigation Compose (androidx.navigation:navigation-compose is Android-only)
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.9.2")
+
+            // Koin's Compose Multiplatform integration (koin-androidx-compose is Android-only)
+            implementation("io.insert-koin:koin-compose:4.2.2")
+            implementation("io.insert-koin:koin-compose-viewmodel:4.2.2")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -52,9 +60,13 @@ kotlin {
     }
 }
 
+compose.resources {
+    packageOfResClass = "com.shoppilist.shared.resources"
+}
+
 android {
     namespace = "com.shoppilist.shared"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
