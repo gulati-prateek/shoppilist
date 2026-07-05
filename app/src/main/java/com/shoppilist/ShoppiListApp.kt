@@ -10,7 +10,8 @@ import com.shoppilist.di.retailerModule
 import com.shoppilist.di.subListModule
 import com.shoppilist.di.suggestionModule
 import com.shoppilist.di.viewModelModule
-import com.shoppilist.sync.ProactiveSuggestionWorker
+import com.shoppilist.shared.sync.ProactiveSuggestionScheduler
+import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -31,6 +32,6 @@ class ShoppiListApp : Application() {
                 viewModelModule
             )
         }
-        ProactiveSuggestionWorker.schedule(this)
+        get<ProactiveSuggestionScheduler>().schedule()
     }
 }

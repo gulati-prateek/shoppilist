@@ -6,6 +6,8 @@ import com.russhwolf.settings.SharedPreferencesSettings
 import com.shoppilist.shared.data.local.*
 import com.shoppilist.data.local.seed.DatabaseSeederCallback
 import com.shoppilist.shared.data.session.SessionManager
+import com.shoppilist.shared.sync.AndroidProactiveSuggestionScheduler
+import com.shoppilist.shared.sync.ProactiveSuggestionScheduler
 import org.koin.dsl.module
 
 val appModule = module {
@@ -44,4 +46,6 @@ val appModule = module {
         val prefs = get<Context>().getSharedPreferences("shoppilist_session", Context.MODE_PRIVATE)
         SessionManager(SharedPreferencesSettings(prefs))
     }
+
+    single<ProactiveSuggestionScheduler> { AndroidProactiveSuggestionScheduler(get()) }
 }

@@ -57,6 +57,11 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+        androidMain.dependencies {
+            // Backs the Android actual of ProactiveSuggestionScheduler (WorkManager is Android-only;
+            // the iOS actual uses BGTaskScheduler instead).
+            implementation("androidx.work:work-runtime-ktx:2.8.1")
+        }
     }
 }
 
