@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.savedstate.read
 import com.shoppilist.shared.domain.CountryLanguageData
 import com.shoppilist.shared.ui.screens.*
 
@@ -61,7 +62,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             }
         }
         composable(Screen.LanguageSelection.route) { backStackEntry ->
-            val countryCode = backStackEntry.arguments?.getString("countryCode") ?: "US"
+            val countryCode = backStackEntry.arguments?.read { getStringOrNull("countryCode") } ?: "US"
             val country = CountryLanguageData.countries.find { it.code == countryCode }
                 ?: CountryLanguageData.countries.first()
             LanguageSelectionScreen(country = country) {
@@ -86,7 +87,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             CreateListScreen { navController.popBackStack() }
         }
         composable(Screen.ListDetail.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             ListDetailScreen(
                 listId = listId,
                 onOpenItem = { itemId -> navController.navigate(Screen.ItemOrderOnline.createRoute(itemId, listId)) },
@@ -97,23 +98,23 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             )
         }
         composable(Screen.AddItem.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             AddItemScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.Voice.route) {
             VoiceScreen(onBack = { navController.popBackStack() })
         }
         composable(Screen.Assignments.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             AssignmentsScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.Invite.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             InviteScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.ItemOrderOnline.route) { backStackEntry ->
-            val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val itemId = backStackEntry.arguments?.read { getStringOrNull("itemId") } ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             ItemOrderOnlineScreen(
                 itemId = itemId,
                 listId = listId,
@@ -122,7 +123,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             )
         }
         composable(Screen.OrderWholeList.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.getString("listId") ?: ""
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             OrderWholeListScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.Settings.route) {

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
+import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.ItemCategoryEntity
 import com.shoppilist.shared.data.local.ListMemberEntity
 import com.shoppilist.shared.data.local.ShoppingItemEntity
@@ -115,7 +116,7 @@ fun ListDetailScreen(
 
     val otherActivePresence = remember(presence, currentUserId) {
         presence.firstOrNull { p ->
-            p.userId != currentUserId && (System.currentTimeMillis() - p.lastActiveAt) < 2 * 60 * 1000
+            p.userId != currentUserId && (currentTimeMillis() - p.lastActiveAt) < 2 * 60 * 1000
         }
     }
     var otherPresenceName by remember { mutableStateOf<String?>(null) }
