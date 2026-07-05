@@ -8,7 +8,7 @@ name: iOS build check
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
