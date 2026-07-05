@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
     id("androidx.room")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
 }
 
 kotlin {
@@ -29,6 +31,16 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
             implementation("androidx.room:room-runtime:2.8.4")
             implementation("androidx.sqlite:sqlite-bundled:2.5.0")
+
+            // Compose Multiplatform — core UI toolkit, shared across Android + iOS
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+
+            // KMP-compatible ViewModel (androidx.lifecycle.ViewModel doesn't exist outside Android)
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

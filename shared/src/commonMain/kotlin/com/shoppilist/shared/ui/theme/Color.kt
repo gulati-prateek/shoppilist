@@ -1,4 +1,4 @@
-package com.shoppilist.ui.theme
+package com.shoppilist.shared.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
