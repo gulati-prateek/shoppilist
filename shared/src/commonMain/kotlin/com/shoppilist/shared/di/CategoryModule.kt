@@ -1,4 +1,4 @@
-package com.shoppilist.di
+package com.shoppilist.shared.di
 
 import com.shoppilist.shared.data.repository.ItemCategoryRepository
 import com.shoppilist.shared.data.repository.RoomItemCategoryRepository

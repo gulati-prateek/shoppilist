@@ -2,14 +2,14 @@ package com.shoppilist
 
 import android.app.Application
 import com.shoppilist.di.appModule
-import com.shoppilist.di.categoryModule
-import com.shoppilist.di.collaborationModule
-import com.shoppilist.di.notificationModule
-import com.shoppilist.di.repositoryModule
-import com.shoppilist.di.retailerModule
-import com.shoppilist.di.subListModule
-import com.shoppilist.di.suggestionModule
-import com.shoppilist.di.viewModelModule
+import com.shoppilist.shared.di.categoryModule
+import com.shoppilist.shared.di.collaborationModule
+import com.shoppilist.shared.di.notificationModule
+import com.shoppilist.shared.di.repositoryModule
+import com.shoppilist.shared.di.retailerModule
+import com.shoppilist.shared.di.subListModule
+import com.shoppilist.shared.di.suggestionModule
+import com.shoppilist.shared.di.viewModelModule
 import com.shoppilist.shared.sync.ProactiveSuggestionScheduler
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext

@@ -1,4 +1,4 @@
-package com.shoppilist.di
+package com.shoppilist.shared.di
 
 import com.shoppilist.shared.data.repository.*
 import com.shoppilist.shared.data.session.SessionManager

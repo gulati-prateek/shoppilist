@@ -1,7 +1,7 @@
-package com.shoppilist.di
+package com.shoppilist.shared.di
 
 import com.shoppilist.shared.presentation.*
-import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val viewModelModule = module {

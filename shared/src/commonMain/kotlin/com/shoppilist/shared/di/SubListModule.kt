@@ -1,4 +1,4 @@
-package com.shoppilist.di
+package com.shoppilist.shared.di
 
 import com.shoppilist.shared.domain.*
 import org.koin.dsl.module

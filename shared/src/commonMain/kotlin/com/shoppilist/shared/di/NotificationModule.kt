@@ -1,4 +1,4 @@
-package com.shoppilist.di
+package com.shoppilist.shared.di
 
 import com.shoppilist.shared.data.repository.NotificationRepository
 import com.shoppilist.shared.data.repository.RoomNotificationRepository
