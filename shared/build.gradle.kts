@@ -82,6 +82,18 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Something in the dependency graph pulls koin-compose-viewmodel up to 4.2.2 on the iOS
+// (Kotlin/Native) configurations despite the explicit 4.0.0 request above -- 4.2.2's iOS klibs
+// were built with a newer Kotlin compiler (ABI 2.3.0) than this project's Kotlin 2.0.21 can
+// consume. Force every configuration to the version this project can actually use.
+configurations.configureEach {
+    resolutionStrategy.force(
+        "io.insert-koin:koin-compose-viewmodel:4.0.0",
+        "io.insert-koin:koin-compose:4.0.0",
+        "io.insert-koin:koin-android:4.0.0"
+    )
+}
+
 dependencies {
     add("kspCommonMainMetadata", "androidx.room:room-compiler:2.8.4")
     add("kspAndroid", "androidx.room:room-compiler:2.8.4")
