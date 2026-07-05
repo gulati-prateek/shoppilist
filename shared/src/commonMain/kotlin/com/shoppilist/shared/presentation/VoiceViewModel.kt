@@ -1,10 +1,10 @@
-package com.shoppilist.presentation
+package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shoppilist.voice.CommandExecutor
-import com.shoppilist.voice.VoiceIntentProcessor
-import com.shoppilist.voice.VoiceIntentResult
+import com.shoppilist.shared.voice.CommandExecutor
+import com.shoppilist.shared.voice.VoiceIntentProcessor
+import com.shoppilist.shared.voice.VoiceIntentResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -30,8 +30,8 @@ class VoiceViewModel(
             if (parsed is VoiceIntentResult.Success) {
                 val exec = executor.execute(parsed.intent)
                 when (exec) {
-                    is com.shoppilist.voice.ExecutionResult.Success -> _result.value = exec.message
-                    is com.shoppilist.voice.ExecutionResult.Failure -> _result.value = "Error: ${exec.error}"
+                    is com.shoppilist.shared.voice.ExecutionResult.Success -> _result.value = exec.message
+                    is com.shoppilist.shared.voice.ExecutionResult.Failure -> _result.value = "Error: ${exec.error}"
                 }
             } else if (parsed is VoiceIntentResult.Failure) {
                 _result.value = "Parse error: ${parsed.errorMessage}"

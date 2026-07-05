@@ -1,5 +1,6 @@
 package com.shoppilist.affiliate
 
+import com.shoppilist.shared.affiliate.RetailerUrlBuilder
 import com.shoppilist.shared.data.local.SponsoredRetailerEntity
 import org.junit.Assert.*
 import org.junit.Test

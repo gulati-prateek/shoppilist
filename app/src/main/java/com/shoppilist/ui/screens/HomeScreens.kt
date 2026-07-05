@@ -26,8 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.shoppilist.shared.data.local.ShoppingListEntity
-import com.shoppilist.presentation.HomeViewModel
-import com.shoppilist.presentation.ListMeta
+import com.shoppilist.shared.presentation.HomeViewModel
+import com.shoppilist.shared.presentation.ListMeta
 
 private val PRESET_LIST_COLORS = listOf("#2ECC71", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280")
 

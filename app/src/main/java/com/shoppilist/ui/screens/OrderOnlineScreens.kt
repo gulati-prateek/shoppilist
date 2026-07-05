@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.shoppilist.shared.data.local.SponsoredRetailerEntity
-import com.shoppilist.presentation.OrderOnlineViewModel
+import com.shoppilist.shared.presentation.OrderOnlineViewModel
 import kotlinx.coroutines.launch
 
 private val SponsoredAmber = Color(0xFFF59E0B)

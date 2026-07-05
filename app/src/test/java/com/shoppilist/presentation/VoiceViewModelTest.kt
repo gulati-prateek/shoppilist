@@ -1,6 +1,7 @@
 package com.shoppilist.presentation
 
-import com.shoppilist.voice.*
+import com.shoppilist.shared.presentation.VoiceViewModel
+import com.shoppilist.shared.voice.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

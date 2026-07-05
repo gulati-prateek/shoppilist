@@ -1,4 +1,4 @@
-package com.shoppilist.voice
+package com.shoppilist.shared.voice
 
 sealed class VoiceIntent {
     data class CreateList(val name: String) : VoiceIntent()

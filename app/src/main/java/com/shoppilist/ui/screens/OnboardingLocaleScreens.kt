@@ -14,7 +14,7 @@ import com.shoppilist.R
 import com.shoppilist.shared.domain.AppLanguage
 import com.shoppilist.shared.domain.Country
 import com.shoppilist.shared.domain.CountryLanguageData
-import com.shoppilist.presentation.OnboardingViewModel
+import com.shoppilist.shared.presentation.OnboardingViewModel
 
 /** Country selection (§2.1) — first onboarding step, before language and before auth. */
 @Composable

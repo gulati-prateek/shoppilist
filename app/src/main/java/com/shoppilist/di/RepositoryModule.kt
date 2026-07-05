@@ -1,11 +1,11 @@
 package com.shoppilist.di
 
 import com.shoppilist.shared.data.repository.*
-import com.shoppilist.data.session.SessionManager
+import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.domain.*
-import com.shoppilist.voice.CommandExecutor
-import com.shoppilist.voice.RuleBasedProcessor
-import com.shoppilist.voice.VoiceIntentProcessor
+import com.shoppilist.shared.voice.CommandExecutor
+import com.shoppilist.shared.voice.RuleBasedProcessor
+import com.shoppilist.shared.voice.VoiceIntentProcessor
 import org.koin.dsl.module
 
 val repositoryModule = module {

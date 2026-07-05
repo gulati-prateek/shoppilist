@@ -1,6 +1,6 @@
 package com.shoppilist.di
 
-import com.shoppilist.presentation.*
+import com.shoppilist.shared.presentation.*
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 

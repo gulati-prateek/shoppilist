@@ -1,9 +1,11 @@
 package com.shoppilist.di
 
+import android.content.Context
 import androidx.room.Room
+import com.russhwolf.settings.SharedPreferencesSettings
 import com.shoppilist.shared.data.local.*
 import com.shoppilist.data.local.seed.DatabaseSeederCallback
-import com.shoppilist.data.session.SessionManager
+import com.shoppilist.shared.data.session.SessionManager
 import org.koin.dsl.module
 
 val appModule = module {
@@ -38,5 +40,8 @@ val appModule = module {
     single { get<AppDatabase>().affiliateDao() }
     single { get<AppDatabase>().pendingOpDao() }
 
-    single { SessionManager(get()) }
+    single {
+        val prefs = get<Context>().getSharedPreferences("shoppilist_session", Context.MODE_PRIVATE)
+        SessionManager(SharedPreferencesSettings(prefs))
+    }
 }

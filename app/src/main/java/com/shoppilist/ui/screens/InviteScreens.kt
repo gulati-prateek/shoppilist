@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.shoppilist.R
 import com.shoppilist.shared.data.local.ListRole
-import com.shoppilist.presentation.InviteViewModel
+import com.shoppilist.shared.presentation.InviteViewModel
 
 @Composable
 private fun roleLabel(role: ListRole): String = when (role) {

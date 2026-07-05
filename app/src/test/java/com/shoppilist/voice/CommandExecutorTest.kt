@@ -2,6 +2,7 @@ package com.shoppilist.voice
 
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import com.shoppilist.shared.domain.*
+import com.shoppilist.shared.voice.*
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*

@@ -1,11 +1,11 @@
-package com.shoppilist.presentation
+package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shoppilist.shared.data.local.ListMemberEntity
 import com.shoppilist.shared.data.local.ListRole
 import com.shoppilist.shared.data.local.UserDao
-import com.shoppilist.data.session.SessionManager
+import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.domain.CreateInviteUseCase
 import com.shoppilist.shared.domain.GetListMembersUseCase
 import com.shoppilist.shared.domain.RemoveListMemberUseCase

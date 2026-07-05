@@ -99,6 +99,9 @@ dependencies {
     // JSON parsing used by the sync helper (KMP-portable, unlike Gson)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // Backs :shared's SessionManager — this brings SharedPreferencesSettings for the Android side
+    implementation("com.russhwolf:multiplatform-settings:1.1.1")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

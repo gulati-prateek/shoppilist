@@ -15,7 +15,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.shoppilist.R
-import com.shoppilist.presentation.AssignmentsViewModel
+import com.shoppilist.shared.presentation.AssignmentsViewModel
 
 /** "Who's Getting What" panel (§2.11). */
 @OptIn(ExperimentalMaterial3Api::class)

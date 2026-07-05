@@ -34,8 +34,8 @@ import org.koin.androidx.compose.koinViewModel
 import com.shoppilist.shared.data.local.ItemCategoryEntity
 import com.shoppilist.shared.data.local.ListMemberEntity
 import com.shoppilist.shared.data.local.ShoppingItemEntity
-import com.shoppilist.presentation.AmbiguousCategoryPrompt
-import com.shoppilist.presentation.ListDetailViewModel
+import com.shoppilist.shared.presentation.AmbiguousCategoryPrompt
+import com.shoppilist.shared.presentation.ListDetailViewModel
 
 private enum class ListViewMode { LIST, AISLE, MY_ITEMS }
 

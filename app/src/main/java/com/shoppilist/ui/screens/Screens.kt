@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import org.koin.androidx.compose.koinViewModel
-import com.shoppilist.presentation.AuthViewModel
-import com.shoppilist.presentation.ListDetailViewModel
+import com.shoppilist.shared.presentation.AuthViewModel
+import com.shoppilist.shared.presentation.ListDetailViewModel
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
@@ -173,7 +173,7 @@ fun AddItemScreen(listId: String, viewModel: ListDetailViewModel = koinViewModel
 }
 
 @Composable
-fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.presentation.VoiceViewModel = org.koin.androidx.compose.koinViewModel()) {
+fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.shared.presentation.VoiceViewModel = org.koin.androidx.compose.koinViewModel()) {
     val input by viewModel.inputText.collectAsState()
     val result by viewModel.result.collectAsState()
     val context = LocalContext.current
@@ -293,7 +293,7 @@ fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.presentation.Voice
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: com.shoppilist.presentation.SettingsViewModel = koinViewModel(),
+    viewModel: com.shoppilist.shared.presentation.SettingsViewModel = koinViewModel(),
     onBack: () -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.load() }

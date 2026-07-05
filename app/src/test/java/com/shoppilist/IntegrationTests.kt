@@ -1,7 +1,7 @@
 package com.shoppilist
 
-import com.shoppilist.affiliate.AffiliateUrlBuilder
-import com.shoppilist.voice.*
+import com.shoppilist.shared.affiliate.AffiliateUrlBuilder
+import com.shoppilist.shared.voice.*
 import org.junit.Test
 import org.junit.Assert.*
 

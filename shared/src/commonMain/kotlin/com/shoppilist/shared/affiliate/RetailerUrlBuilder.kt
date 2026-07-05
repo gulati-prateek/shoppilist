@@ -1,12 +1,11 @@
-package com.shoppilist.affiliate
+package com.shoppilist.shared.affiliate
 
 import com.shoppilist.shared.data.local.SponsoredRetailerEntity
-import java.net.URLEncoder
 
 /** Builds a retailer search URL from its `searchUrlTemplate` (contains a literal "{item}" placeholder). */
 object RetailerUrlBuilder {
     fun searchUrl(retailer: SponsoredRetailerEntity, itemName: String): String {
-        val encoded = URLEncoder.encode(itemName, "UTF-8")
+        val encoded = encodeUrlComponent(itemName)
         return retailer.searchUrlTemplate.replace("{item}", encoded)
     }
 

@@ -1,12 +1,12 @@
-package com.shoppilist.presentation
+package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shoppilist.affiliate.RetailerUrlBuilder
+import com.shoppilist.shared.affiliate.RetailerUrlBuilder
 import com.shoppilist.shared.data.local.ShoppingItemEntity
 import com.shoppilist.shared.data.local.SponsoredRetailerEntity
 import com.shoppilist.shared.data.local.UserDao
-import com.shoppilist.data.session.SessionManager
+import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.domain.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

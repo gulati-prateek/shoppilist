@@ -1,12 +1,9 @@
-package com.shoppilist.voice
+package com.shoppilist.shared.voice
 
 import com.shoppilist.shared.domain.*
-import com.shoppilist.shared.data.local.ShoppingItemEntity
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.util.*
 
 /**
  * CommandExecutor maps VoiceIntent to domain UseCases.

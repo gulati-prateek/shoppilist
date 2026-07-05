@@ -41,6 +41,10 @@ kotlin {
 
             // KMP-compatible ViewModel (androidx.lifecycle.ViewModel doesn't exist outside Android)
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+
+            // KMP-portable key-value storage backing SessionManager (SharedPreferences on Android
+            // has no Kotlin/Native equivalent; this wraps SharedPreferences/NSUserDefaults per platform)
+            implementation("com.russhwolf:multiplatform-settings:1.1.1")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

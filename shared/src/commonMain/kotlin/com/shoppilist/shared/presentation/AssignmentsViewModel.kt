@@ -1,4 +1,4 @@
-package com.shoppilist.presentation
+package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

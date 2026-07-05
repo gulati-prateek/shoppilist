@@ -1,5 +1,6 @@
 package com.shoppilist.voice
 
+import com.shoppilist.shared.voice.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
