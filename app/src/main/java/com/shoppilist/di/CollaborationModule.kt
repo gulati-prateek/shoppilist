@@ -1,0 +1,20 @@
+package com.shoppilist.di
+
+import com.shoppilist.shared.data.repository.*
+import com.shoppilist.shared.domain.*
+import org.koin.dsl.module
+
+val collaborationModule = module {
+    single<ListMemberRepository> { RoomListMemberRepository(get(), get()) }
+    single<PresenceRepository> { RoomPresenceRepository(get()) }
+    single<InvitationRepository> { RoomInvitationRepository(get(), get()) }
+
+    factory { GetListMembersUseCase(get()) }
+    factory { AddListMemberUseCase(get()) }
+    factory { RemoveListMemberUseCase(get()) }
+    factory { CreateInviteUseCase(get()) }
+    factory { GetInvitesForListUseCase(get()) }
+    factory { AcceptInviteUseCase(get()) }
+    factory { MarkPresenceUseCase(get()) }
+    factory { GetPresenceForListUseCase(get()) }
+}

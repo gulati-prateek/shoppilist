@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ShoppiList</string>
+    <string name="app_tagline">تسوّقوا معًا، من أي مكان.</string>
+
+    <string name="action_login">تسجيل الدخول</string>
+    <string name="action_register">إنشاء حساب</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_save">حفظ</string>
+    <string name="action_send_invite">إرسال دعوة</string>
+    <string name="action_copy">نسخ</string>
+    <string name="action_remove">إزالة</string>
+
+    <string name="label_email_or_phone">البريد الإلكتروني أو رقم الهاتف</string>
+    <string name="label_role">الدور</string>
+
+    <string name="title_invite">دعوة</string>
+    <string name="title_members">الأعضاء</string>
+    <string name="title_whos_getting_what">من سيحضر ماذا</string>
+    <string name="label_unassigned">غير مُسنَد</string>
+    <string name="title_select_country">اختر بلدك</string>
+    <string name="title_select_language">اختر لغتك</string>
+
+    <string name="role_owner">المالك</string>
+    <string name="role_editor">محرر</string>
+    <string name="role_viewer">مشاهد</string>
+
+    <string name="empty_no_items">لا توجد عناصر بعد.</string>
+</resources>

@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ShoppiList</string>
+    <string name="app_tagline">Faites vos courses ensemble, où que vous soyez.</string>
+
+    <string name="action_login">Connexion</string>
+    <string name="action_register">S\'inscrire</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="action_send_invite">Envoyer l\'invitation</string>
+    <string name="action_copy">Copier</string>
+    <string name="action_remove">Supprimer</string>
+
+    <string name="label_email_or_phone">E-mail ou numéro de téléphone</string>
+    <string name="label_role">Rôle</string>
+
+    <string name="title_invite">Inviter</string>
+    <string name="title_members">Membres</string>
+    <string name="title_whos_getting_what">Qui prend quoi</string>
+    <string name="label_unassigned">Non attribué</string>
+    <string name="title_select_country">Sélectionnez votre pays</string>
+    <string name="title_select_language">Sélectionnez votre langue</string>
+
+    <string name="role_owner">Propriétaire</string>
+    <string name="role_editor">Éditeur</string>
+    <string name="role_viewer">Lecteur</string>
+
+    <string name="empty_no_items">Aucun article pour le moment.</string>
+</resources>

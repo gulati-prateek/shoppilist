@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ShoppiList</string>
+    <string name="app_tagline">Belanja bersama, di mana saja.</string>
+
+    <string name="action_login">Masuk</string>
+    <string name="action_register">Daftar</string>
+    <string name="action_cancel">Batal</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_send_invite">Kirim Undangan</string>
+    <string name="action_copy">Salin</string>
+    <string name="action_remove">Hapus</string>
+
+    <string name="label_email_or_phone">Email atau nomor telepon</string>
+    <string name="label_role">Peran</string>
+
+    <string name="title_invite">Undang</string>
+    <string name="title_members">Anggota</string>
+    <string name="title_whos_getting_what">Siapa Membeli Apa</string>
+    <string name="label_unassigned">Belum Ditugaskan</string>
+    <string name="title_select_country">Pilih negara Anda</string>
+    <string name="title_select_language">Pilih bahasa Anda</string>
+
+    <string name="role_owner">Pemilik</string>
+    <string name="role_editor">Editor</string>
+    <string name="role_viewer">Pemirsa</string>
+
+    <string name="empty_no_items">Belum ada barang.</string>
+</resources>

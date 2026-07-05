@@ -1,0 +1,20 @@
+package com.shoppilist.ui.theme
+
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+// The product spec (§4) specifies Inter; no font files are bundled in this project, so this
+// uses the platform default sans-serif at Inter's weights/sizes. Add Inter as a downloadable
+// font resource (res/font/) to match exactly.
+val ShoppiListTypography = Typography(
+    displaySmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 36.sp),
+    headlineSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 24.sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 16.sp),
+    bodyLarge = TextStyle(fontWeight = FontWeight.Normal, fontSize = 16.sp),
+    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp),
+    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 13.sp),
+    labelSmall = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp)
+)

@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ShoppiList</string>
+    <string name="app_tagline">Shop together, anywhere.</string>
+
+    <string name="action_login">Login</string>
+    <string name="action_register">Register</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_send_invite">Send Invite</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_remove">Remove</string>
+
+    <string name="label_email_or_phone">Email or phone number</string>
+    <string name="label_role">Role</string>
+
+    <string name="title_invite">Invite</string>
+    <string name="title_members">Members</string>
+    <string name="title_whos_getting_what">Who\'s Getting What</string>
+    <string name="label_unassigned">Unassigned</string>
+    <string name="title_select_country">Select your country</string>
+    <string name="title_select_language">Select your language</string>
+
+    <string name="role_owner">Owner</string>
+    <string name="role_editor">Editor</string>
+    <string name="role_viewer">Viewer</string>
+
+    <string name="empty_no_items">No items yet.</string>
+</resources>

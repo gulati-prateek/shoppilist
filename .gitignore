@@ -1,0 +1,24 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+local.properties
+.DS_Store
+.externalNativeBuild
+.cxx
+
+# Build output (root + every module)
+build/
+**/build/
+/captures
+
+# IDE — user-specific, not shared
+.idea/
+
+# Claude Code local session/config — not shared
+.claude/
+
+# Release signing — never commit real keystore material
+keystore/*.jks
+keystore/*.keystore
+keystore/keystore.properties

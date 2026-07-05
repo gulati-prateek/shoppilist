@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ShoppiList</string>
+    <string name="app_tagline">साथ मिलकर, कहीं भी खरीदारी करें।</string>
+
+    <string name="action_login">लॉग इन करें</string>
+    <string name="action_register">पंजीकरण करें</string>
+    <string name="action_cancel">रद्द करें</string>
+    <string name="action_save">सहेजें</string>
+    <string name="action_send_invite">आमंत्रण भेजें</string>
+    <string name="action_copy">कॉपी करें</string>
+    <string name="action_remove">हटाएं</string>
+
+    <string name="label_email_or_phone">ईमेल या फ़ोन नंबर</string>
+    <string name="label_role">भूमिका</string>
+
+    <string name="title_invite">आमंत्रित करें</string>
+    <string name="title_members">सदस्य</string>
+    <string name="title_whos_getting_what">कौन क्या लाएगा</string>
+    <string name="label_unassigned">असाइन नहीं किया गया</string>
+    <string name="title_select_country">अपना देश चुनें</string>
+    <string name="title_select_language">अपनी भाषा चुनें</string>
+
+    <string name="role_owner">मालिक</string>
+    <string name="role_editor">संपादक</string>
+    <string name="role_viewer">दर्शक</string>
+
+    <string name="empty_no_items">अभी कोई आइटम नहीं है।</string>
+</resources>
