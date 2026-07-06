@@ -40,3 +40,19 @@ jobs:
       # point, and Koin/Room/BackgroundTasks iOS wiring end to end, ahead of a real Xcode project.
       - name: Assemble Shared.xcframework
         run: ./gradlew :shared:assembleSharedDebugXCFramework --stacktrace
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: cd iosApp && xcodegen generate
+
+      # No Apple Developer account/signing identity exists yet (Phase 7) -- Simulator builds
+      # don't need one, hence CODE_SIGNING_ALLOWED=NO.
+      - name: Build iOS app for Simulator
+        run: |
+          cd iosApp
+          xcodebuild -project iosApp.xcodeproj -scheme iosApp \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

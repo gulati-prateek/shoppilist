@@ -1,0 +1,25 @@
+name: iosApp
+options:
+  bundleIdPrefix: com.shoppilist
+  deploymentTarget:
+    iOS: "16.0"
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shoppilist.ios
+        PRODUCT_NAME: iosApp
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        ENABLE_BITCODE: NO
+        GENERATE_INFOPLIST_FILE: NO
+    dependencies:
+      - framework: ../shared/build/XCFrameworks/debug/Shared.xcframework
+        embed: true
