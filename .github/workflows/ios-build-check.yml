@@ -48,11 +48,48 @@ jobs:
         run: cd iosApp && xcodegen generate
 
       # No Apple Developer account/signing identity exists yet (Phase 7) -- Simulator builds
-      # don't need one, hence CODE_SIGNING_ALLOWED=NO.
+      # don't need one, hence CODE_SIGNING_ALLOWED=NO. -derivedDataPath is fixed (not the default
+      # hashed DerivedData location) so the next step can find the built .app deterministically.
       - name: Build iOS app for Simulator
         run: |
           cd iosApp
           xcodebuild -project iosApp.xcodeproj -scheme iosApp \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      # Proves the app actually launches and stays alive in Simulator, not just that it builds.
+      - name: Launch smoke test in Simulator
+        run: |
+          set -euo pipefail
+          APP_PATH="iosApp/build/Build/Products/Debug-iphonesimulator/iosApp.app"
+          BUNDLE_ID="com.shoppilist.ios"
+
+          UDID=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}')
+          echo "Using simulator $UDID"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl launch "$UDID" "$BUNDLE_ID"
+
+          sleep 5
+
+          xcrun simctl io "$UDID" screenshot launch-screenshot.png || true
+
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE_ID"; then
+            echo "App is still running 5s after launch -- smoke test passed."
+          else
+            echo "App is NOT running 5s after launch -- it crashed or exited. Smoke test failed."
+            exit 1
+          fi
+
+      - name: Upload launch screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-screenshot
+          path: launch-screenshot.png
+          if-no-files-found: ignore
