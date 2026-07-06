@@ -82,7 +82,11 @@ jobs:
           if xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE_ID"; then
             echo "App is still running 5s after launch -- smoke test passed."
           else
-            echo "App is NOT running 5s after launch -- it crashed or exited. Smoke test failed."
+            echo "App is NOT running 5s after launch -- it crashed or exited."
+            echo "--- Recent unified log for the app process ---"
+            xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "iosApp"' 2>/dev/null || true
+            echo "--- Crash reports from the last 5 minutes ---"
+            find ~/Library/Logs/DiagnosticReports -mmin -5 -print -exec cat {} \; 2>/dev/null || echo "(none found)"
             exit 1
           fi
 
