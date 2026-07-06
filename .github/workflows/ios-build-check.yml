@@ -34,3 +34,9 @@ jobs:
             :shared:compileKotlinIosSimulatorArm64 \
             :shared:compileKotlinIosX64 \
             --stacktrace
+
+      # Phase 6: also link+assemble the XCFramework (a different task class than plain
+      # compilation -- exercises framework export config, MainViewController's exposed entry
+      # point, and Koin/Room/BackgroundTasks iOS wiring end to end, ahead of a real Xcode project.
+      - name: Assemble Shared.xcframework
+        run: ./gradlew :shared:assembleSharedDebugXCFramework --stacktrace

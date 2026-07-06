@@ -17,10 +17,20 @@ kotlin {
 
     // iOS targets can only be *built* on a macOS host (Xcode toolchain required by Kotlin/Native).
     // Declaring them here is safe on any OS; actual iosX64/iosArm64/iosSimulatorArm64 compilation
-    // will only run on the cloud macOS CI set up in a later phase.
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
+    // will only run on the cloud macOS CI set up in Phase 6.
+    val xcfName = "Shared"
+    val xcf = org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFrameworkConfig(project, xcfName)
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { target ->
+        target.binaries.framework {
+            baseName = xcfName
+            xcf.add(this)
+            isStatic = true
+        }
+    }
 
     applyDefaultHierarchyTemplate()
 

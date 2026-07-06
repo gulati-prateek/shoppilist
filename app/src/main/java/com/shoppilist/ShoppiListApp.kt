@@ -4,6 +4,7 @@ import android.app.Application
 import com.shoppilist.di.appModule
 import com.shoppilist.shared.di.categoryModule
 import com.shoppilist.shared.di.collaborationModule
+import com.shoppilist.shared.di.databaseDaoModule
 import com.shoppilist.shared.di.notificationModule
 import com.shoppilist.shared.di.repositoryModule
 import com.shoppilist.shared.di.retailerModule
@@ -22,6 +23,7 @@ class ShoppiListApp : Application() {
             androidContext(this@ShoppiListApp)
             modules(
                 appModule,
+                databaseDaoModule,
                 categoryModule,
                 collaborationModule,
                 notificationModule,
