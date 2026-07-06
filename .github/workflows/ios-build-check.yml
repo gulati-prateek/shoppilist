@@ -73,16 +73,22 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
 
           xcrun simctl install "$UDID" "$APP_PATH"
-          xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" "$BUNDLE_ID")
+          echo "$LAUNCH_OUTPUT"
+          APP_PID=$(echo "$LAUNCH_OUTPUT" | grep -oE '[0-9]+$')
+          echo "App PID: $APP_PID"
 
           sleep 5
 
           xcrun simctl io "$UDID" screenshot launch-screenshot.png || true
 
-          if xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE_ID"; then
-            echo "App is still running 5s after launch -- smoke test passed."
+          # Simulator apps run as real macOS processes on the host -- checking the PID directly
+          # is more reliable than `launchctl list` (which doesn't reflect RunningBoard-managed
+          # foreground app processes on modern iOS Simulator runtimes).
+          if kill -0 "$APP_PID" 2>/dev/null; then
+            echo "App is still running (PID $APP_PID) 5s after launch -- smoke test passed."
           else
-            echo "App is NOT running 5s after launch -- it crashed or exited."
+            echo "App (PID $APP_PID) is NOT running 5s after launch -- it crashed or exited."
             echo "--- Recent unified log for the app process ---"
             xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "iosApp"' 2>/dev/null || true
             echo "--- Crash reports from the last 5 minutes ---"
