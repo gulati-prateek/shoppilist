@@ -25,6 +25,7 @@ val databaseDaoModule = module {
     single { get<AppDatabase>().sponsoredClickDao() }
     single { get<AppDatabase>().presenceDao() }
     single { get<AppDatabase>().invitationDao() }
+    single { get<AppDatabase>().listActivityDao() }
     single { get<AppDatabase>().notificationDao() }
     single { get<AppDatabase>().voiceDao() }
     single { get<AppDatabase>().affiliateDao() }

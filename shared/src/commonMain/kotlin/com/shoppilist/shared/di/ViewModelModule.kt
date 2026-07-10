@@ -8,13 +8,13 @@ val viewModelModule = module {
     viewModel { AuthViewModel(get(), get()) }
     viewModel { SplashViewModel(get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get()) }
-    viewModel { HomeViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { HomeViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { CreateListViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel {
         ListDetailViewModel(
             get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
             get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
-            get(), get(), get()
+            get(), get(), get(), get(), get(), get()
         )
     }
     viewModel { AssignmentsViewModel(get(), get(), get(), get()) }
@@ -24,4 +24,5 @@ val viewModelModule = module {
     viewModel { SettingsViewModel(get(), get(), get(), get()) }
     viewModel { AdminViewModel(get(), get()) }
     viewModel { VoiceViewModel(get(), get()) }
+    viewModel { ActivityViewModel(get()) }
 }

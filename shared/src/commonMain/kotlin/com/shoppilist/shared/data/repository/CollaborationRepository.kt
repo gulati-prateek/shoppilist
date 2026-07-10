@@ -73,6 +73,8 @@ class RoomPresenceRepository(private val presenceDao: PresenceDao) : PresenceRep
 
 interface InvitationRepository {
     fun getInvitesForList(listId: String): Flow<List<InvitationEntity>>
+    /** Pending invites addressed to this contact (recipient's email or phone) — Home banner. */
+    fun getPendingForContact(contact: String): Flow<List<InvitationEntity>>
     suspend fun createInvite(
         listId: String,
         inviterUserId: String,
@@ -91,6 +93,9 @@ class RoomInvitationRepository(
 
     override fun getInvitesForList(listId: String): Flow<List<InvitationEntity>> =
         invitationDao.getInvitesForList(listId)
+
+    override fun getPendingForContact(contact: String): Flow<List<InvitationEntity>> =
+        invitationDao.getPendingForContact(contact)
 
     override suspend fun createInvite(
         listId: String,
@@ -125,6 +130,12 @@ class RoomInvitationRepository(
     override suspend fun accept(token: String, userId: String): Result<Unit> {
         return try {
             val invite = invitationDao.findByToken(token) ?: return Result.failure(IllegalArgumentException("Invite not found"))
+            if (invite.status != "PENDING") return Result.failure(IllegalStateException("This invite is no longer active"))
+            val expiresAt = invite.expiresAt
+            if (expiresAt != null && expiresAt < currentTimeMillis()) {
+                invitationDao.updateStatus(invite.inviteId, "EXPIRED")
+                return Result.failure(IllegalStateException("This invite has expired"))
+            }
             val listId = invite.listId ?: return Result.failure(IllegalStateException("Invite has no list"))
             listMemberRepository.addMember(listId, userId, invite.role)
             invitationDao.updateStatus(invite.inviteId, "ACCEPTED")

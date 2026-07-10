@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -16,10 +17,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,14 +29,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
+import com.shoppilist.shared.data.local.InvitationEntity
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import com.shoppilist.shared.location.rememberLocationController
 import com.shoppilist.shared.presentation.CreateListStep
 import com.shoppilist.shared.presentation.CreateListViewModel
 import com.shoppilist.shared.presentation.HomeViewModel
 import com.shoppilist.shared.presentation.ListMeta
+import com.shoppilist.shared.ui.components.ProfileAvatar
+
+/** The five top-level shopping domains the catalog spans — surfaced on the dashboard to signal the
+ *  app isn't grocery-only. Each maps to the category ids a quick-start list would emphasize. */
+private data class ShopDomain(val emoji: String, val label: String)
+private val SHOP_DOMAINS = listOf(
+    ShopDomain("🛒", "Grocery"),
+    ShopDomain("👗", "Fashion"),
+    ShopDomain("📱", "Electronics"),
+    ShopDomain("🏠", "Home"),
+    ShopDomain("🎁", "Gifts")
+)
 
 private val PRESET_LIST_COLORS = listOf("#2ECC71", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280")
 
@@ -59,29 +75,52 @@ fun HomeScreen(
     onCreateList: () -> Unit = {},
     onOpenList: (String) -> Unit = {},
     onOpenVoice: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenProfile: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val listMeta by viewModel.listMeta.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val pendingInvites by viewModel.pendingInvites.collectAsState()
+    var renameTarget by remember { mutableStateOf<ShoppingListEntity?>(null) }
+
+    renameTarget?.let { target ->
+        RenameListDialog(
+            currentName = target.name,
+            onDismiss = { renameTarget = null },
+            onConfirm = { newName ->
+                viewModel.renameList(target.listId, newName)
+                renameTarget = null
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onOpenProfile) {
+                        val name = currentUser?.fullName
+                        ProfileAvatar(
+                            initial = name?.firstOrNull()?.toString(),
+                            seed = currentUser?.userId ?: "me",
+                            size = 32.dp
+                        )
+                    }
+                },
                 title = { Text("ShoppiList") },
                 actions = {
                     IconButton(onClick = onOpenVoice) {
                         Icon(Icons.Default.Mic, "Voice")
                     }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, "Settings")
-                    }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreateList) {
-                Icon(Icons.Default.Add, "Create List")
-            }
+            ExtendedFloatingActionButton(
+                onClick = onCreateList,
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("New list") }
+            )
         }
     ) { padding ->
         Column(
@@ -92,25 +131,150 @@ fun HomeScreen(
             if (state.loading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            LocationChipRow(viewModel)
-            LazyColumn {
-                items(state.lists, key = { it.listId }) { list ->
-                    HomeListRow(
-                        list = list,
-                        meta = listMeta[list.listId],
-                        onOpen = { onOpenList(list.listId) },
-                        onArchive = { viewModel.archiveList(list.listId) },
-                        onTogglePin = { viewModel.togglePin(list.listId, !list.pinned) },
-                        onDelete = { viewModel.deleteList(list.listId) }
+
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 88.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                item(key = "tagline") {
+                    Text(
+                        "Shop anything, together",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp)
                     )
-                    HorizontalDivider()
                 }
-            }
-            if (state.error != null) {
-                Text("Error: ${state.error}", modifier = Modifier.padding(16.dp))
+                item(key = "domains") { ShopDomainStrip(onPick = { onCreateList() }) }
+                item(key = "location") { LocationChipRow(viewModel) }
+
+                if (pendingInvites.isNotEmpty()) {
+                    item(key = "invites-header") {
+                        Text(
+                            "Invitations",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(pendingInvites, key = { "invite-${it.inviteId}" }) { invite ->
+                        PendingInviteCard(
+                            invite = invite,
+                            onAccept = { viewModel.acceptInvite(invite) }
+                        )
+                    }
+                }
+
+                if (!state.loading && state.lists.isEmpty()) {
+                    item(key = "empty") { EmptyListsState() }
+                } else {
+                    item(key = "lists-header") {
+                        Text(
+                            "Your lists",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(state.lists, key = { it.listId }) { list ->
+                        HomeListCard(
+                            list = list,
+                            meta = listMeta[list.listId],
+                            onOpen = { onOpenList(list.listId) },
+                            onArchive = { viewModel.archiveList(list.listId) },
+                            onTogglePin = { viewModel.togglePin(list.listId, !list.pinned) },
+                            onRename = { renameTarget = list },
+                            onDelete = { viewModel.deleteList(list.listId) }
+                        )
+                    }
+                }
+
+                if (state.error != null) {
+                    item(key = "error") {
+                        Text("Error: ${state.error}", modifier = Modifier.padding(16.dp))
+                    }
+                }
             }
         }
     }
+}
+
+/** Horizontal strip of shopping-domain chips communicating the app spans grocery→electronics. */
+@Composable
+private fun ShopDomainStrip(onPick: (ShopDomain) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(SHOP_DOMAINS, key = { it.label }) { domain ->
+            AssistChip(
+                onClick = { onPick(domain) },
+                label = { Text("${domain.emoji} ${domain.label}") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyListsState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("🛍️", style = MaterialTheme.typography.displayMedium)
+        Spacer(Modifier.height(12.dp))
+        Text("No lists yet", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Tap \"New list\" to start shopping — groceries, fashion, electronics and more.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun PendingInviteCard(invite: InvitationEntity, onAccept: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("You've been invited to a list", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Invited as ${invite.role.name.lowercase()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Button(onClick = onAccept) { Text("Accept") }
+        }
+    }
+}
+
+@Composable
+private fun RenameListDialog(currentName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var name by remember { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename list") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("List name") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 /**
@@ -165,15 +329,17 @@ private fun LocationChipRow(viewModel: HomeViewModel) {
 }
 
 @Composable
-private fun HomeListRow(
+private fun HomeListCard(
     list: ShoppingListEntity,
     meta: ListMeta?,
     onOpen: () -> Unit,
     onArchive: () -> Unit,
     onTogglePin: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -190,78 +356,122 @@ private fun HomeListRow(
             }
         )
     }
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value != SwipeToDismissBoxValue.Settled) {
-                onArchive()
-                true
-            } else {
-                false
-            }
-        }
-    )
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Default.Archive,
-                    contentDescription = "Archive list",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
+
+    val itemCount = meta?.itemCount ?: 0
+    val checkedCount = meta?.checkedCount ?: 0
+    val progress = if (itemCount > 0) checkedCount.toFloat() / itemCount else 0f
+
+    ElevatedCard(
+        onClick = onOpen,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
-        val memberCount = meta?.memberCount ?: 0
-        val peopleLabel = if (memberCount <= 1) "Just you" else "$memberCount people"
-        ListItem(
-            headlineContent = { Text(list.name) },
-            supportingContent = {
-                Column {
-                    val description = list.description
-                    if (!description.isNullOrBlank()) Text(description)
-                    Text("${meta?.itemCount ?: 0} items · $peopleLabel", style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            leadingContent = {
-                val color = colorFromHex(list.colorHex)
-                if (color != null) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                colorFromHex(list.colorHex)?.let { color ->
                     Box(
                         modifier = Modifier
-                            .size(14.dp)
+                            .size(12.dp)
                             .clip(CircleShape)
                             .background(color)
                     )
+                    Spacer(Modifier.width(8.dp))
                 }
-            },
-            trailingContent = {
-                Row {
-                    IconButton(onClick = onTogglePin) {
-                        Icon(
-                            if (list.pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                            contentDescription = if (list.pinned) "Unpin" else "Pin to top",
-                            tint = if (list.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                Text(
+                    list.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onTogglePin) {
+                    Icon(
+                        if (list.pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                        contentDescription = if (list.pinned) "Unpin" else "Pin to top",
+                        tint = if (list.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                    )
+                }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, "More")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) },
+                            onClick = { menuOpen = false; onRename() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Archive") },
+                            leadingIcon = { Icon(Icons.Default.Archive, null) },
+                            onClick = { menuOpen = false; onArchive() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = { menuOpen = false; confirmDelete = true }
                         )
                     }
-                    IconButton(onClick = { confirmDelete = true }) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete list",
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                    }
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onOpen() }
-        )
+            }
+
+            val description = list.description
+            if (!description.isNullOrBlank()) {
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape)
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (itemCount > 0) "$checkedCount/$itemCount done" else "No items yet",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                CollaboratorAvatars(meta)
+            }
+        }
+    }
+}
+
+/** Overlapping collaborator avatars on a list card; "+N" when there are more than shown. */
+@Composable
+private fun CollaboratorAvatars(meta: ListMeta?) {
+    val avatars = meta?.memberAvatars ?: emptyList()
+    val extra = (meta?.memberCount ?: 0) - avatars.size
+    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+        avatars.forEach { a ->
+            ProfileAvatar(
+                initial = a.initial,
+                seed = a.seed,
+                size = 26.dp,
+                modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+            )
+        }
+        if (extra > 0) {
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+$extra", style = MaterialTheme.typography.labelSmall)
+            }
+        }
     }
 }
 

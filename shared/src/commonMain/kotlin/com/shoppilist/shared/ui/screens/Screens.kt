@@ -48,7 +48,7 @@ fun SplashScreen(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("ShoppiList", style = MaterialTheme.typography.displaySmall)
-            Text("Shop together, anywhere.", style = MaterialTheme.typography.bodyMedium)
+            Text("Shop anything, together — groceries, fashion, electronics & more.", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -64,7 +64,7 @@ fun OnboardingScreen(onNext: () -> Unit) {
     ) {
         Text("Welcome to ShoppiList", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Shop together, anywhere.")
+        Text("Shop anything, together — groceries, fashion, electronics & more.")
         Spacer(modifier = Modifier.height(32.dp))
         Button(onClick = onNext) { Text("Get Started") }
     }
@@ -347,6 +347,9 @@ fun ProfileSetupScreen(
     var lastName by remember(state.loading) { mutableStateOf(state.initialLastName) }
     var email by remember(state.loading) { mutableStateOf(state.initialEmail) }
     var address by remember(state.loading) { mutableStateOf(state.initialAddress) }
+    var city by remember(state.loading) { mutableStateOf(state.initialCity) }
+    var stateRegion by remember(state.loading) { mutableStateOf(state.initialState) }
+    var pincode by remember(state.loading) { mutableStateOf(state.initialPincode) }
     var location by remember { mutableStateOf<StoredLocation?>(null) }
     var locationError by remember { mutableStateOf<String?>(null) }
     var fetchingLocation by remember { mutableStateOf(false) }
@@ -356,7 +359,10 @@ fun ProfileSetupScreen(
             fetchingLocation = false
             locationError = null
             location = fetched
+            // GPS reverse-geocode fills the granular fields (screenshot c).
             fetched.addressLine?.let { address = it }
+            fetched.city?.let { if (city.isBlank()) city = it }
+            fetched.state?.let { if (stateRegion.isBlank()) stateRegion = it }
         },
         onError = { message ->
             fetchingLocation = false
@@ -406,8 +412,29 @@ fun ProfileSetupScreen(
         }
         OutlinedTextField(
             value = address, onValueChange = { address = it },
-            label = { Text("Address (optional)") },
+            label = { Text("Address line (optional)") },
             minLines = 2,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = city, onValueChange = { city = it },
+                label = { Text("City") }, singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = stateRegion, onValueChange = { stateRegion = it },
+                label = { Text("State") }, singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = pincode, onValueChange = { pincode = it },
+            label = { Text("Postal / PIN code") }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
         if (locationController.isAvailable) {
@@ -442,7 +469,7 @@ fun ProfileSetupScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { viewModel.save(firstName, lastName, email, address, location) },
+            onClick = { viewModel.save(firstName, lastName, email, address, city, stateRegion, pincode, location) },
             enabled = !state.saving && !state.loading,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -559,16 +586,20 @@ fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.shared.presentatio
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
+fun ProfileScreen(
     viewModel: com.shoppilist.shared.presentation.SettingsViewModel = koinViewModel(),
     onBack: () -> Unit,
-    onOpenAdmin: () -> Unit = {}
+    onOpenAdmin: () -> Unit = {},
+    onLoggedOut: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) { viewModel.load() }
     val user by viewModel.user.collectAsState()
     val authUser by viewModel.authUser.collectAsState()
     val isAdmin by viewModel.isAdmin.collectAsState()
+    val loggedOut by viewModel.loggedOut.collectAsState()
     var showCountryPicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(loggedOut) { if (loggedOut) onLoggedOut() }
 
     Column(
         modifier = Modifier
@@ -580,7 +611,26 @@ fun SettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, "Back")
             }
-            Text("Settings", style = MaterialTheme.typography.headlineSmall)
+            Text("Profile", style = MaterialTheme.typography.headlineSmall)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Profile header: avatar + name (screenshot b).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        ) {
+            val name = user?.fullName?.takeIf { it.isNotBlank() }
+            com.shoppilist.shared.ui.components.ProfileAvatar(
+                initial = name?.firstOrNull()?.toString(),
+                seed = user?.userId ?: "me",
+                size = 64.dp
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                name ?: "Your profile",
+                style = MaterialTheme.typography.titleLarge
+            )
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -598,10 +648,14 @@ fun SettingsScreen(
                     )
                 } else {
                     user?.let { profile ->
-                        ProfileInfoRow(label = "Name", value = profile.fullName.ifBlank { "Not set" })
-                        Spacer(modifier = Modifier.height(8.dp))
-                        profile.address?.let { addr ->
-                            ProfileInfoRow(label = "Address", value = addr)
+                        val fullAddress = listOfNotNull(
+                            profile.address?.takeIf { it.isNotBlank() },
+                            profile.city?.takeIf { it.isNotBlank() },
+                            profile.state?.takeIf { it.isNotBlank() },
+                            profile.pincode?.takeIf { it.isNotBlank() }
+                        ).joinToString(", ")
+                        if (fullAddress.isNotBlank()) {
+                            ProfileInfoRow(label = "Address", value = fullAddress)
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -679,6 +733,16 @@ fun SettingsScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        OutlinedButton(
+            onClick = { viewModel.logout() },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Log out")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 

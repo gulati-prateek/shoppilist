@@ -4,6 +4,7 @@ package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -19,7 +20,9 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,6 +75,7 @@ fun ListDetailScreen(
     onOpenItem: (String) -> Unit = {},
     onOrderWholeList: (String) -> Unit = {},
     onOpenAssignments: (String) -> Unit = {},
+    onOpenActivity: (String) -> Unit = {},
     onInvite: (String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
@@ -104,6 +108,7 @@ fun ListDetailScreen(
     var assigneeTargetItem by remember { mutableStateOf<ShoppingItemEntity?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
     var currentUserName by remember { mutableStateOf("You") }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(listId) {
         viewModel.markPresent(listId)
@@ -144,6 +149,12 @@ fun ListDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onOpenActivity(listId) }) {
+                        Icon(Icons.Default.History, contentDescription = "Activity")
+                    }
+                    IconButton(onClick = { onInvite(listId) }) {
+                        Icon(Icons.Default.PersonAdd, contentDescription = "Add people")
+                    }
                     IconButton(onClick = {
                         selectMode = !selectMode
                         selectedIds = emptySet()
@@ -155,12 +166,12 @@ fun ListDetailScreen(
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
-                            text = { Text("Who's Getting What") },
-                            onClick = { menuExpanded = false; onOpenAssignments(listId) }
+                            text = { Text("Rename list") },
+                            onClick = { menuExpanded = false; showRenameDialog = true }
                         )
                         DropdownMenuItem(
-                            text = { Text("Invite") },
-                            onClick = { menuExpanded = false; onInvite(listId) }
+                            text = { Text("Who's Getting What") },
+                            onClick = { menuExpanded = false; onOpenAssignments(listId) }
                         )
                         DropdownMenuItem(
                             text = { Text("Order All Online") },
@@ -197,6 +208,12 @@ fun ListDetailScreen(
                     )
                 }
             }
+
+            MembersRosterRow(
+                members = members,
+                resolveName = { viewModel.resolveUserName(it) },
+                onAddPeople = { onInvite(listId) }
+            )
 
             if (!groceryCardDismissed && groceryApps.isNotEmpty()) {
                 GroceryAppsCard(apps = groceryApps, onDismiss = { viewModel.dismissGroceryCard() })
@@ -282,7 +299,8 @@ fun ListDetailScreen(
                         onCheck = onCheck,
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
-                        onOpenAssignee = { assigneeTargetItem = it }
+                        onOpenAssignee = { assigneeTargetItem = it },
+                        resolveName = { viewModel.resolveUserName(it) }
                     )
                     ListViewMode.AISLE -> AisleModeContent(
                         items = items,
@@ -293,7 +311,8 @@ fun ListDetailScreen(
                         onCheck = onCheck,
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
-                        onOpenAssignee = { assigneeTargetItem = it }
+                        onOpenAssignee = { assigneeTargetItem = it },
+                        resolveName = { viewModel.resolveUserName(it) }
                     )
                     ListViewMode.MY_ITEMS -> AisleModeContent(
                         items = myItems,
@@ -304,7 +323,8 @@ fun ListDetailScreen(
                         onCheck = onCheck,
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
-                        onOpenAssignee = { assigneeTargetItem = it }
+                        onOpenAssignee = { assigneeTargetItem = it },
+                        resolveName = { viewModel.resolveUserName(it) }
                     )
                 }
             }
@@ -388,6 +408,33 @@ fun ListDetailScreen(
                 }) { Text("Create") }
             },
             dismissButton = { TextButton(onClick = { showSubListDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showRenameDialog) {
+        var newName by remember { mutableStateOf(list?.name ?: "") }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename list") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("List name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.renameList(listId, newName)
+                        showRenameDialog = false
+                    },
+                    enabled = newName.isNotBlank()
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") } }
         )
     }
 
@@ -562,7 +609,8 @@ private fun GroupedListModeContent(
     onCheck: (ShoppingItemEntity) -> Unit,
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
-    onOpenAssignee: (ShoppingItemEntity) -> Unit
+    onOpenAssignee: (ShoppingItemEntity) -> Unit,
+    resolveName: suspend (String) -> String? = { null }
 ) {
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     val unchecked = items.filter { !it.checked }
@@ -586,7 +634,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
                 }
             }
         }
@@ -606,7 +654,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { "c_${it.itemId}" }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
                 }
             }
         }
@@ -623,7 +671,8 @@ private fun AisleModeContent(
     onCheck: (ShoppingItemEntity) -> Unit,
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
-    onOpenAssignee: (ShoppingItemEntity) -> Unit
+    onOpenAssignee: (ShoppingItemEntity) -> Unit,
+    resolveName: suspend (String) -> String? = { null }
 ) {
     val groups = remember(items, categoryById) { groupByCategory(items, categoryById) }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -638,9 +687,47 @@ private fun AisleModeContent(
                 }
             }
             items(group.items, key = { it.itemId }) { itemEntity ->
-                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee)
+                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
             }
         }
+    }
+}
+
+/** Item 12: horizontal roster of list members' avatars with a "+ add people" affordance at the end. */
+@Composable
+private fun MembersRosterRow(
+    members: List<ListMemberEntity>,
+    resolveName: suspend (String) -> String?,
+    onAddPeople: () -> Unit
+) {
+    var names by remember(members) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    LaunchedEffect(members) {
+        val map = mutableMapOf<String, String>()
+        members.forEach { m -> resolveName(m.userId)?.let { map[m.userId] = it } }
+        names = map
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy((-8).dp), modifier = Modifier.weight(1f)) {
+            members.take(6).forEach { m ->
+                val name = names[m.userId]
+                com.shoppilist.shared.ui.components.ProfileAvatar(
+                    initial = name?.firstOrNull()?.toString(),
+                    seed = m.userId,
+                    size = 30.dp,
+                    modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
+                )
+            }
+        }
+        AssistChip(
+            onClick = onAddPeople,
+            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            label = { Text("Add people") }
+        )
     }
 }
 
@@ -653,8 +740,14 @@ private fun ItemRow(
     onCheck: (ShoppingItemEntity) -> Unit,
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
-    onOpenAssignee: (ShoppingItemEntity) -> Unit
+    onOpenAssignee: (ShoppingItemEntity) -> Unit,
+    resolveName: suspend (String) -> String? = { null }
 ) {
+    // Item 15: show who marked this item purchased ("✓ by Alice").
+    var checkedByName by remember(item.itemId, item.checkedBy) { mutableStateOf<String?>(null) }
+    LaunchedEffect(item.checkedBy, item.checked) {
+        checkedByName = if (item.checked) item.checkedBy?.let { resolveName(it) } else null
+    }
     ListItem(
         headlineContent = {
             Text(
@@ -669,12 +762,20 @@ private fun ItemRow(
                 if (qtyLine.isNotBlank()) Text(qtyLine, style = MaterialTheme.typography.bodySmall)
                 val notes = item.notes
                 if (!notes.isNullOrBlank()) Text(notes, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    text = if (item.assignedTo != null) "Assigned" else "+ Assign",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (item.assignedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.clickable { onOpenAssignee(item) }
-                )
+                if (item.checked && checkedByName != null) {
+                    Text(
+                        "✓ by $checkedByName",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        text = if (item.assignedTo != null) "Assigned" else "+ Assign",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (item.assignedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.clickable { onOpenAssignee(item) }
+                    )
+                }
             }
         },
         leadingContent = {

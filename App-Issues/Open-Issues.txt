@@ -1,28 +1,18 @@
-1.Country list not scrollable.
-2.Voice command not working.
-3.Delete list option is missing.
-4.Create list form UI distorted in android phone.
-5.Online store UI distorted.
-6.Register with phone number and otp is missing.
-7.Register with email should go for verification of email.
-8.Profile should show email and phone number are verified or not.
-9.Either email or phone number should be in verified to proceed further on dashboard page.
-10. Application UI should support all below resolutions:
-Standard phone 375–390 iPhone 12–15;
-most mid-range Android Large phone 412–430 iPhone Pro Max, Pixel Pro, Samsung Ultra;
-Small tablet 600–768 Small Android tablets;
-iPad MiniLarge tablet 810–1024 iPad, iPad Pro;
-Foldables (unfolded)673–840 Galaxy Fold, Pixel Fold;
-
-11. Things beyond just resolution to take care:
-Aspect ratios: not just width/height but ratios like 16:9, 18:9, 19.5:9, 20:9 — notches and cutouts affect safe areas.
-Pixel density (DPI/PPI): test @1x, @2x, @3x asset scaling; use dp/pt units, never hardcode px.
-Safe areas / notches: iPhone notch/Dynamic Island, Android punch-holes, gesture nav bars.
-Orientation: portrait and landscape, especially for tablets.
-OS-level text scaling: test with large accessibility font sizes — layouts often break here before they break on screen size.
-
-12. Error on registration flow with email.
-13. Error on registration flow with phone number
-
-
-
+You a graphic designer, android app developer, iPhone app developer and product owner as well which can create home page design for applications as well.
+ShoppiList an android and iPhone application which user collaborate to shop smartly. 
+Lets make below changes to the current version of android and iPhone application:
+1. Design home page screen reflecting it a generic, global shopping list application which includes grocery, cloths, electronics items etc.
+2. Home page should show login option with Google, Email and Phone number with OTP
+3. Email registration flow should accept email and password.
+4. Select country list before registration as is.
+5. Dashboard section will show a profile icon.
+6. There should be logout option for the user on dashboard.
+7. Profile section should replace the settings sections.
+8. User should be able to change country on profile section.
+9. Add list should show list of items to add in the shopping list.
+10. Add/Edit name of the list.
+11. Show activities icon on the list. This should display activities done on the list like items added/deleted/edit by which user.
+12. Add more participant to a list. +user icon the list to send invite to a new user through phone or email.
+13. New user can first download app and register for itself and then added to that list.
+14. If user is already registered on shoppilist then user directly added to the list. Reciepient should first accept the invitation within application to collaborate on the list.
+15. Different collaborator and mark shopping done for an item. 

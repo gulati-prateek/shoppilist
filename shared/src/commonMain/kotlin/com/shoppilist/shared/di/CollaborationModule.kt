@@ -14,7 +14,12 @@ val collaborationModule = module {
     factory { RemoveListMemberUseCase(get()) }
     factory { CreateInviteUseCase(get()) }
     factory { GetInvitesForListUseCase(get()) }
+    factory { GetPendingInvitesForContactUseCase(get()) }
     factory { AcceptInviteUseCase(get()) }
     factory { MarkPresenceUseCase(get()) }
     factory { GetPresenceForListUseCase(get()) }
+
+    // Activity feed (item 11) — DAO-backed, same direct-DAO pattern as CatalogUseCases.
+    factory { RecordActivityUseCase(get(), get()) }
+    factory { GetListActivityUseCase(get()) }
 }

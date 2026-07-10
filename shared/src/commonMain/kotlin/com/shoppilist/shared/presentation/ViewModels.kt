@@ -8,6 +8,8 @@ import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.auth.AuthUser
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.backend.RemoteProfile
+import com.shoppilist.shared.data.local.InvitationEntity
+import com.shoppilist.shared.data.local.ListActivityAction
 import com.shoppilist.shared.data.local.ShoppingItemEntity
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
@@ -177,6 +179,9 @@ class HomeViewModel(
     private val deleteListUseCase: DeleteListUseCase,
     private val getListItemsUseCase: GetListItemsUseCase,
     private val getListMembersUseCase: GetListMembersUseCase,
+    private val renameListUseCase: RenameListUseCase,
+    private val getPendingInvitesForContactUseCase: GetPendingInvitesForContactUseCase,
+    private val acceptInviteUseCase: AcceptInviteUseCase,
     private val sessionManager: SessionManager,
     private val userDao: UserDao,
     private val profileBackend: ProfileBackend,
@@ -188,6 +193,11 @@ class HomeViewModel(
 
     private val _listMeta = MutableStateFlow<Map<String, ListMeta>>(emptyMap())
     val listMeta: StateFlow<Map<String, ListMeta>> = _listMeta
+
+    /** Signed-in user, for the dashboard profile avatar (initials / blank). */
+    val currentUser: StateFlow<UserEntity?> =
+        userDao.getUserFlow(sessionManager.requireUserId())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /** Last fetched device location (dashboard chip) — restored from storage on relogin. */
     private val _lastLocation = MutableStateFlow(sessionManager.lastLocation())
@@ -207,20 +217,38 @@ class HomeViewModel(
             getAllListsUseCase()
                 .flatMapLatest { lists ->
                     if (lists.isEmpty()) {
-                        flowOf(emptyMap())
+                        flowOf(emptyList())
                     } else {
                         combine(
                             lists.map { list ->
                                 combine(
                                     getListItemsUseCase(list.listId),
                                     getListMembersUseCase(list.listId)
-                                ) { items, members -> list.listId to ListMeta(items.size, members.size) }
+                                ) { items, members -> Triple(list.listId, items, members) }
                             }
-                        ) { pairs -> pairs.toMap() }
+                        ) { it.toList() }
                     }
                 }
                 .catch { }
-                .collect { _listMeta.value = it }
+                .collect { triples ->
+                    // Resolve member initials here (collect is suspend, unlike combine's transform)
+                    // so cards can show collaborator avatars without a separate name lookup in the UI.
+                    _listMeta.value = triples.associate { (listId, items, members) ->
+                        val avatars = members.take(3).map { m ->
+                            val name = userDao.getUserOnce(m.userId)?.fullName?.trim().orEmpty()
+                            MemberAvatar(
+                                initial = name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                seed = m.userId
+                            )
+                        }
+                        listId to ListMeta(
+                            itemCount = items.size,
+                            checkedCount = items.count { it.checked },
+                            memberCount = members.size,
+                            memberAvatars = avatars
+                        )
+                    }
+                }
         }
     }
 
@@ -257,6 +285,26 @@ class HomeViewModel(
     fun deleteList(listId: String) {
         viewModelScope.launch { deleteListUseCase(listId) }
     }
+
+    fun renameList(listId: String, newName: String) {
+        viewModelScope.launch { renameListUseCase(listId, newName) }
+    }
+
+    /** Pending invites addressed to the signed-in user's own email/phone (items 13/14). */
+    val pendingInvites: StateFlow<List<InvitationEntity>> =
+        userDao.getUserFlow(sessionManager.requireUserId())
+            .flatMapLatest { user ->
+                val contacts = listOfNotNull(user?.email, user?.phone).filter { it.isNotBlank() }
+                if (contacts.isEmpty()) flowOf(emptyList())
+                else combine(contacts.map { getPendingInvitesForContactUseCase(it) }) { arr ->
+                    arr.toList().flatten().distinctBy { it.inviteId }
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun acceptInvite(invite: InvitationEntity) {
+        viewModelScope.launch { acceptInviteUseCase(invite.token, sessionManager.requireUserId()) }
+    }
 }
 
 data class HomeUiState(
@@ -265,7 +313,15 @@ data class HomeUiState(
     val error: String? = null
 )
 
-data class ListMeta(val itemCount: Int, val memberCount: Int)
+/** One collaborator's avatar seed for a list card: [initial] shown on a color derived from [seed]. */
+data class MemberAvatar(val initial: String, val seed: String)
+
+data class ListMeta(
+    val itemCount: Int,
+    val checkedCount: Int = 0,
+    val memberCount: Int = 0,
+    val memberAvatars: List<MemberAvatar> = emptyList()
+)
 
 data class AmbiguousCategoryPrompt(val itemId: String, val itemName: String, val suggestedCategoryId: String)
 data class LeftoverPrompt(val listId: String, val listName: String, val unchecked: List<ShoppingItemEntity>)
@@ -292,6 +348,9 @@ class ListDetailViewModel(
     private val getPresenceForListUseCase: GetPresenceForListUseCase,
     private val suggestionEngine: SuggestionEngine,
     private val getGroceryAppsForCountryUseCase: GetGroceryAppsForCountryUseCase,
+    private val getItemOnceUseCase: GetItemOnceUseCase,
+    private val renameListUseCase: RenameListUseCase,
+    private val recordActivity: RecordActivityUseCase,
     private val userDao: com.shoppilist.shared.data.local.UserDao,
     private val sessionManager: SessionManager
 ) : ViewModel() {
@@ -358,12 +417,22 @@ class ListDetailViewModel(
         viewModelScope.launch {
             val result = addItemUseCase(listId, itemName, quantity, unit, notes = notes, addedBy = currentUserId)
             result.getOrNull()?.let { added ->
+                runCatching { recordActivity(listId, currentUserId, ListActivityAction.ADDED_ITEM, itemName = itemName) }
                 val ambiguousCategoryId = added.ambiguousCategoryId
                 if (ambiguousCategoryId != null) {
                     _ambiguousCategoryPrompt.value = AmbiguousCategoryPrompt(added.itemId, itemName, ambiguousCategoryId)
                 }
             }
             refreshSuggestions()
+        }
+    }
+
+    /** Item 10: rename the current list, recorded in the activity feed. */
+    fun renameList(listId: String, newName: String) {
+        viewModelScope.launch {
+            renameListUseCase(listId, newName).onSuccess {
+                runCatching { recordActivity(listId, currentUserId, ListActivityAction.RENAMED_LIST, detail = newName.trim()) }
+            }
         }
     }
 
@@ -395,13 +464,22 @@ class ListDetailViewModel(
 
     fun markChecked(itemId: String, checked: Boolean) {
         viewModelScope.launch {
-            markItemCheckedUseCase(itemId, checked)
+            val item = getItemOnceUseCase(itemId)
+            markItemCheckedUseCase(itemId, checked, checkedBy = currentUserId)
+            item?.let {
+                val action = if (checked) ListActivityAction.CHECKED_ITEM else ListActivityAction.UNCHECKED_ITEM
+                runCatching { recordActivity(it.listId, currentUserId, action, itemName = it.name) }
+            }
         }
     }
 
     fun deleteItem(itemId: String) {
         viewModelScope.launch {
+            val item = getItemOnceUseCase(itemId)
             deleteItemUseCase(itemId)
+            item?.let {
+                runCatching { recordActivity(it.listId, currentUserId, ListActivityAction.DELETED_ITEM, itemName = it.name) }
+            }
         }
     }
 

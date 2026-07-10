@@ -37,6 +37,12 @@ class GetInvitesForListUseCase(private val repo: InvitationRepository) {
     operator fun invoke(listId: String): Flow<List<InvitationEntity>> = repo.getInvitesForList(listId)
 }
 
+/** Pending invites addressed to the signed-in user's email/phone — drives the Home banner where
+ *  a recipient accepts (items 13/14). */
+class GetPendingInvitesForContactUseCase(private val repo: InvitationRepository) {
+    operator fun invoke(contact: String): Flow<List<InvitationEntity>> = repo.getPendingForContact(contact)
+}
+
 class AcceptInviteUseCase(private val repo: InvitationRepository) {
     suspend operator fun invoke(token: String, userId: String): Result<Unit> = repo.accept(token, userId)
 }

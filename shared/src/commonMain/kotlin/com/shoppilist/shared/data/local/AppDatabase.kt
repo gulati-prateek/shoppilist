@@ -99,6 +99,26 @@ data class ListMemberEntity(
     val joinedAt: Long = currentTimeMillis()
 )
 
+/** Collaboration action types recorded in the per-list activity feed (§ activity log). */
+enum class ListActivityAction {
+    ADDED_ITEM, DELETED_ITEM, EDITED_ITEM, CHECKED_ITEM, UNCHECKED_ITEM,
+    RENAMED_LIST, MEMBER_INVITED, MEMBER_JOINED, MEMBER_REMOVED
+}
+
+/** Append-only audit feed of who did what on a list (added/removed/checked items, renames,
+ *  membership changes). `actorName` is denormalized so the feed renders without a user join. */
+@Entity(tableName = "list_activity", indices = [Index("listId")])
+data class ListActivityEntity(
+    @PrimaryKey val id: String,
+    val listId: String,
+    val actorUserId: String,
+    val actorName: String,
+    val action: ListActivityAction,
+    val itemName: String? = null,
+    val detail: String? = null,
+    val createdAt: Long = currentTimeMillis()
+)
+
 @Entity(
     tableName = "shopping_lists",
     indices = [Index("ownerId"), Index("householdId"), Index("parentListId")]
@@ -134,6 +154,10 @@ data class ShoppingItemEntity(
     val notes: String? = null,
     val estimatedPrice: Double? = null,
     val checked: Boolean = false,
+    // Who marked the item purchased/checked, for collaboration attribution ("✓ by Alice").
+    // Cleared when unchecked.
+    val checkedBy: String? = null,
+    val checkedAt: Long? = null,
     val addedBy: String? = null,
     val assignedTo: String? = null,
     val assignedBy: String? = null,
@@ -437,8 +461,8 @@ interface ShoppingItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: ShoppingItemEntity)
 
-    @Query("UPDATE shopping_items SET checked = :checked WHERE itemId = :id")
-    suspend fun setChecked(id: String, checked: Boolean)
+    @Query("UPDATE shopping_items SET checked = :checked, checkedBy = :checkedBy, checkedAt = :checkedAt WHERE itemId = :id")
+    suspend fun setChecked(id: String, checked: Boolean, checkedBy: String?, checkedAt: Long?)
 
     @Query("UPDATE shopping_items SET assignedTo = :userId, assignedBy = :assignedBy, assignedAt = :assignedAt WHERE itemId = :itemId")
     suspend fun assignItem(itemId: String, userId: String?, assignedBy: String?, assignedAt: Long?)
@@ -608,8 +632,23 @@ interface InvitationDao {
     @Query("SELECT * FROM invitations WHERE token = :token LIMIT 1")
     suspend fun findByToken(token: String): InvitationEntity?
 
+    /** Pending invites addressed to a given contact (the recipient's email or phone) — powers the
+     *  Home "you've been invited" banner. Cross-device delivery is layered on in Phase 4; locally
+     *  this matches invites created on the same device/account. */
+    @Query("SELECT * FROM invitations WHERE inviteeContact = :contact AND status = 'PENDING' ORDER BY createdAt DESC")
+    fun getPendingForContact(contact: String): Flow<List<InvitationEntity>>
+
     @Query("UPDATE invitations SET status = :status WHERE inviteId = :inviteId")
     suspend fun updateStatus(inviteId: String, status: String)
+}
+
+@Dao
+interface ListActivityDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(activity: ListActivityEntity)
+
+    @Query("SELECT * FROM list_activity WHERE listId = :listId ORDER BY createdAt DESC LIMIT :limit")
+    fun getForList(listId: String, limit: Int = 200): Flow<List<ListActivityEntity>>
 }
 
 @Dao
@@ -672,12 +711,13 @@ interface PendingOpDao {
         SponsoredClickEntity::class,
         PresenceEntity::class,
         InvitationEntity::class,
+        ListActivityEntity::class,
         NotificationEntity::class,
         VoiceCommandHistoryEntity::class,
         AffiliateClickEntity::class,
         PendingOpEntity::class
     ],
-    version = 4,
+    version = 5,
     // Schema export across multiple KMP compile targets needs extra Gradle-side wiring this
     // project doesn't have yet; the project already relies on fallbackToDestructiveMigration()
     // instead of real migrations, so schema history files aren't load-bearing here.
@@ -702,6 +742,7 @@ abstract class AppDatabase : androidx.room.RoomDatabase() {
     abstract fun sponsoredClickDao(): SponsoredClickDao
     abstract fun presenceDao(): PresenceDao
     abstract fun invitationDao(): InvitationDao
+    abstract fun listActivityDao(): ListActivityDao
     abstract fun notificationDao(): NotificationDao
     abstract fun voiceDao(): VoiceCommandHistoryDao
     abstract fun affiliateDao(): AffiliateClickDao

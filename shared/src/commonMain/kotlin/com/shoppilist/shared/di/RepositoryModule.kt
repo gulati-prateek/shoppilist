@@ -26,6 +26,7 @@ val repositoryModule = module {
     factory { DeleteListUseCase(get()) }
     factory { ArchiveListUseCase(get()) }
     factory { TogglePinUseCase(get()) }
+    factory { RenameListUseCase(get()) }
     factory { GetListItemsUseCase(get()) }
     factory { GetItemOnceUseCase(get()) }
     factory { AddItemUseCase(get(), get(), get(), get(), get()) }

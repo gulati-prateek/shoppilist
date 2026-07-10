@@ -45,6 +45,20 @@ class SettingsViewModel(
     fun setLocale(countryCode: String, languageCode: String) =
         updateUser { it.copy(countryCode = countryCode, languageCode = languageCode) }
 
+    /** Item 6: sign out. Clears the Firebase session and the local current-user pointer, then the
+     *  screen navigates back to Login. The local data + remembered location survive (see
+     *  SessionManager.clear), so a re-login on this device restores instantly. */
+    private val _loggedOut = MutableStateFlow(false)
+    val loggedOut: StateFlow<Boolean> = _loggedOut
+
+    fun logout() {
+        viewModelScope.launch {
+            runCatching { authService.signOut() }
+            sessionManager.clear()
+            _loggedOut.value = true
+        }
+    }
+
     private fun updateUser(transform: (UserEntity) -> UserEntity) {
         val current = _user.value ?: return
         viewModelScope.launch { userDao.upsert(transform(current)) }

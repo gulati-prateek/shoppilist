@@ -47,6 +47,16 @@ class TogglePinUseCase(private val repo: ShoppingListRepository) {
     suspend operator fun invoke(listId: String, pinned: Boolean): Result<Unit> = repo.setPinned(listId, pinned)
 }
 
+/** Renames a list (item 10) and updates its optional description/color; no-ops on a blank name. */
+class RenameListUseCase(private val repo: ShoppingListRepository) {
+    suspend operator fun invoke(listId: String, newName: String, description: String? = null): Result<Unit> {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Name can't be empty"))
+        val existing = repo.getListOnce(listId) ?: return Result.failure(IllegalStateException("List not found"))
+        return repo.updateList(existing.copy(name = trimmed, description = description ?: existing.description))
+    }
+}
+
 // Item use cases
 class GetListItemsUseCase(private val repo: ShoppingItemRepository) {
     operator fun invoke(listId: String): Flow<List<ShoppingItemEntity>> = repo.getItemsForList(listId)
@@ -119,8 +129,8 @@ class DeleteItemUseCase(private val repo: ShoppingItemRepository) {
 }
 
 class MarkItemCheckedUseCase(private val repo: ShoppingItemRepository) {
-    suspend operator fun invoke(itemId: String, checked: Boolean): Result<Unit> =
-        repo.markItemChecked(itemId, checked)
+    suspend operator fun invoke(itemId: String, checked: Boolean, checkedBy: String? = null): Result<Unit> =
+        repo.markItemChecked(itemId, checked, checkedBy)
 }
 
 class ClearPurchasedUseCase(private val repo: ShoppingItemRepository) {

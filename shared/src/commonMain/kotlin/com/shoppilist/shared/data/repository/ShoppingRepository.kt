@@ -33,7 +33,7 @@ interface ShoppingItemRepository {
     suspend fun addItem(item: ShoppingItemEntity): Result<String>
     suspend fun updateItem(item: ShoppingItemEntity): Result<Unit>
     suspend fun deleteItem(itemId: String): Result<Unit>
-    suspend fun markItemChecked(itemId: String, checked: Boolean): Result<Unit>
+    suspend fun markItemChecked(itemId: String, checked: Boolean, checkedBy: String?): Result<Unit>
     suspend fun clearPurchased(listId: String): Result<Unit>
     suspend fun assignItem(itemId: String, userId: String, assignedBy: String): Result<Unit>
     suspend fun unassignItem(itemId: String): Result<Unit>
@@ -310,9 +310,12 @@ class RoomShoppingItemRepository(
         }
     }
 
-    override suspend fun markItemChecked(itemId: String, checked: Boolean): Result<Unit> {
+    override suspend fun markItemChecked(itemId: String, checked: Boolean, checkedBy: String?): Result<Unit> {
         return try {
-            itemDao.setChecked(itemId, checked)
+            // Attribution is recorded only when checking; unchecking clears it.
+            val by = if (checked) checkedBy else null
+            val at = if (checked) currentTimeMillis() else null
+            itemDao.setChecked(itemId, checked, by, at)
             opManager.queueOp(
                 PendingOpEntity(
                     opId = Uuid.random().toString(),

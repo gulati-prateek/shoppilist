@@ -43,7 +43,10 @@ sealed class Screen(val route: String) {
     object OrderWholeList : Screen("order_list/{listId}") {
         fun createRoute(listId: String) = "order_list/$listId"
     }
-    object Settings : Screen("settings")
+    object Activity : Screen("activity/{listId}") {
+        fun createRoute(listId: String) = "activity/$listId"
+    }
+    object Profile : Screen("profile")
     object AdminDashboard : Screen("admin_dashboard")
 }
 
@@ -115,7 +118,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 onCreateList = { navController.navigate(Screen.CreateList.route) },
                 onOpenList = { listId -> navController.navigate(Screen.ListDetail.createRoute(listId)) },
                 onOpenVoice = { navController.navigate(Screen.Voice.route) },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                onOpenProfile = { navController.navigate(Screen.Profile.route) }
             )
         }
         composable(Screen.CreateList.route) {
@@ -136,6 +139,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 onOpenItem = { itemId -> navController.navigate(Screen.ItemOrderOnline.createRoute(itemId, listId)) },
                 onOrderWholeList = { navController.navigate(Screen.OrderWholeList.createRoute(listId)) },
                 onOpenAssignments = { navController.navigate(Screen.Assignments.createRoute(listId)) },
+                onOpenActivity = { navController.navigate(Screen.Activity.createRoute(listId)) },
                 onInvite = { navController.navigate(Screen.Invite.createRoute(listId)) },
                 onBack = { navController.popBackStack() }
             )
@@ -165,10 +169,17 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
             OrderWholeListScreen(listId = listId, onBack = { navController.popBackStack() })
         }
-        composable(Screen.Settings.route) {
-            SettingsScreen(
+        composable(Screen.Activity.route) { backStackEntry ->
+            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
+            ActivityScreen(listId = listId, onBack = { navController.popBackStack() })
+        }
+        composable(Screen.Profile.route) {
+            ProfileScreen(
                 onBack = { navController.popBackStack() },
-                onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) }
+                onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) },
+                onLoggedOut = {
+                    navController.navigate(Screen.Login.route) { popUpTo(0) }
+                }
             )
         }
         composable(Screen.AdminDashboard.route) {

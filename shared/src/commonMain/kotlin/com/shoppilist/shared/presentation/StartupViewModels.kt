@@ -57,7 +57,10 @@ data class ProfileSetupUiState(
     val initialEmail: String = "",
     /** True when the account itself carries an email (email sign-up) — shown read-only. */
     val emailLocked: Boolean = false,
-    val initialAddress: String = ""
+    val initialAddress: String = "",
+    val initialCity: String = "",
+    val initialState: String = "",
+    val initialPincode: String = ""
 )
 
 /**
@@ -90,7 +93,10 @@ class ProfileViewModel(
                         ?: nameGuess?.substringAfter(" ", "")?.trim().orEmpty(),
                     initialEmail = accountEmail ?: user?.email.orEmpty(),
                     emailLocked = !accountEmail.isNullOrBlank(),
-                    initialAddress = user?.address.orEmpty()
+                    initialAddress = user?.address.orEmpty(),
+                    initialCity = user?.city.orEmpty(),
+                    initialState = user?.state.orEmpty(),
+                    initialPincode = user?.pincode.orEmpty()
                 )
             }
         }
@@ -101,6 +107,9 @@ class ProfileViewModel(
         lastName: String,
         email: String,
         address: String,
+        city: String = "",
+        state: String = "",
+        pincode: String = "",
         location: StoredLocation? = null
     ) {
         val first = firstName.trim()
@@ -137,8 +146,10 @@ class ProfileViewModel(
                     // The account's own (verifiable) email always wins over the optional form field.
                     email = if (_state.value.emailLocked) base.email else formEmail.ifBlank { base.email },
                     address = address.trim().ifBlank { base.address },
-                    city = location?.city ?: base.city,
-                    state = location?.state ?: base.state,
+                    // Granular fields entered directly, else GPS reverse-geocode fallback, else keep.
+                    city = city.trim().ifBlank { location?.city ?: base.city },
+                    state = state.trim().ifBlank { location?.state ?: base.state },
+                    pincode = pincode.trim().ifBlank { base.pincode },
                     countryCode = location?.countryCode ?: base.countryCode
                 )
             }
