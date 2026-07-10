@@ -9,6 +9,7 @@ import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.domain.CreateInviteUseCase
 import com.shoppilist.shared.domain.GetListMembersUseCase
 import com.shoppilist.shared.domain.RemoveListMemberUseCase
+import com.shoppilist.shared.sync.CollaborationSyncManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,7 +26,8 @@ class InviteViewModel(
     private val createInviteUseCase: CreateInviteUseCase,
     private val removeListMemberUseCase: RemoveListMemberUseCase,
     private val userDao: UserDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val collaborationSync: CollaborationSyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InviteUiState())
@@ -45,7 +47,8 @@ class InviteViewModel(
         viewModelScope.launch {
             val result = createInviteUseCase(listId, sessionManager.requireUserId(), contact, channel, role)
             result.onSuccess { invite ->
-                // No real SMS/email delivery in this project (no backend) — surface the join link directly.
+                // Phase 4: push the list + the invite to Firestore so the recipient's device sees it.
+                collaborationSync.shareAndInvite(invite)
                 _uiState.value = _uiState.value.copy(lastInviteLink = "shoppilist.app/join/${invite.token}", error = null)
             }.onFailure {
                 _uiState.value = _uiState.value.copy(error = it.message)

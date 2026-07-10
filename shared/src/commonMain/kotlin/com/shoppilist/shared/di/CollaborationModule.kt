@@ -9,6 +9,11 @@ val collaborationModule = module {
     single<PresenceRepository> { RoomPresenceRepository(get()) }
     single<InvitationRepository> { RoomInvitationRepository(get(), get()) }
 
+    // Phase 4 cross-device sync (backend bound per-platform in the app/iOS modules).
+    single {
+        com.shoppilist.shared.sync.CollaborationSyncManager(get(), get(), get(), get(), get(), get())
+    }
+
     factory { GetListMembersUseCase(get()) }
     factory { AddListMemberUseCase(get()) }
     factory { RemoveListMemberUseCase(get()) }

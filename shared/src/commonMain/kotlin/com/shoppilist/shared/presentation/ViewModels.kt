@@ -8,9 +8,12 @@ import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.auth.AuthUser
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.backend.RemoteProfile
+import com.shoppilist.shared.backend.RemoteInvite
 import com.shoppilist.shared.data.local.InvitationEntity
 import com.shoppilist.shared.data.local.ListActivityAction
+import com.shoppilist.shared.data.local.ListRole
 import com.shoppilist.shared.data.local.ShoppingItemEntity
+import com.shoppilist.shared.sync.CollaborationSyncManager
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
@@ -211,7 +214,8 @@ class HomeViewModel(
     private val userDao: UserDao,
     private val profileBackend: ProfileBackend,
     private val resolveCatalogRegion: ResolveCatalogRegionUseCase,
-    private val syncCatalog: SyncCatalogUseCase
+    private val syncCatalog: SyncCatalogUseCase,
+    private val collaborationSync: CollaborationSyncManager
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
@@ -229,6 +233,8 @@ class HomeViewModel(
     val lastLocation: StateFlow<StoredLocation?> = _lastLocation
 
     init {
+        // Phase 4: begin mirroring shared lists from Firestore into local Room.
+        collaborationSync.start()
         // Keep the region catalog cache warm so the create-list picker opens instantly.
         viewModelScope.launch {
             runCatching { syncCatalog(resolveCatalogRegion()) }
@@ -315,21 +321,38 @@ class HomeViewModel(
         viewModelScope.launch { renameListUseCase(listId, newName) }
     }
 
-    /** Pending invites addressed to the signed-in user's own email/phone (items 13/14). */
+    /** Cross-device Firestore invites addressed to me, kept for accept-routing. */
+    private val remoteInvitesById = MutableStateFlow<Map<String, RemoteInvite>>(emptyMap())
+
+    /** Pending invites addressed to the signed-in user's own email/phone (items 13/14) — merged
+     *  from local Room and cross-device Firestore (Phase 4). */
     val pendingInvites: StateFlow<List<InvitationEntity>> =
         userDao.getUserFlow(sessionManager.requireUserId())
             .flatMapLatest { user ->
                 val contacts = listOfNotNull(user?.email, user?.phone).filter { it.isNotBlank() }
-                if (contacts.isEmpty()) flowOf(emptyList())
-                else combine(contacts.map { getPendingInvitesForContactUseCase(it) }) { arr ->
-                    arr.toList().flatten().distinctBy { it.inviteId }
+                if (contacts.isEmpty()) return@flatMapLatest flowOf(emptyList())
+                val local = combine(contacts.map { getPendingInvitesForContactUseCase(it) }) { it.toList().flatten() }
+                val remote = collaborationSync.observePendingInvites(contacts)
+                combine(local, remote) { localInvites, remoteInvites ->
+                    remoteInvitesById.value = remoteInvites.associateBy { it.id }
+                    (localInvites + remoteInvites.map { it.toInvitationEntity() }).distinctBy { it.inviteId }
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun acceptInvite(invite: InvitationEntity) {
-        viewModelScope.launch { acceptInviteUseCase(invite.token, sessionManager.requireUserId()) }
+        viewModelScope.launch {
+            val remote = remoteInvitesById.value[invite.inviteId]
+            if (remote != null) collaborationSync.acceptInvite(remote)
+            else acceptInviteUseCase(invite.token, sessionManager.requireUserId())
+        }
     }
+
+    private fun RemoteInvite.toInvitationEntity() = InvitationEntity(
+        inviteId = id, listId = listId, inviterUserId = inviterUserId, inviteeContact = inviteeContact,
+        channel = channel, role = runCatching { ListRole.valueOf(role) }.getOrDefault(ListRole.EDITOR),
+        token = id, status = status, expiresAt = expiresAt, createdAt = createdAt
+    )
 }
 
 data class HomeUiState(
@@ -376,6 +399,7 @@ class ListDetailViewModel(
     private val getItemOnceUseCase: GetItemOnceUseCase,
     private val renameListUseCase: RenameListUseCase,
     private val recordActivity: RecordActivityUseCase,
+    private val collaborationSync: CollaborationSyncManager,
     private val userDao: com.shoppilist.shared.data.local.UserDao,
     private val sessionManager: SessionManager
 ) : ViewModel() {
@@ -443,6 +467,7 @@ class ListDetailViewModel(
             val result = addItemUseCase(listId, itemName, quantity, unit, notes = notes, addedBy = currentUserId)
             result.getOrNull()?.let { added ->
                 runCatching { recordActivity(listId, currentUserId, ListActivityAction.ADDED_ITEM, itemName = itemName) }
+                getItemOnceUseCase(added.itemId)?.let { collaborationSync.pushItem(listId, it) }
                 val ambiguousCategoryId = added.ambiguousCategoryId
                 if (ambiguousCategoryId != null) {
                     _ambiguousCategoryPrompt.value = AmbiguousCategoryPrompt(added.itemId, itemName, ambiguousCategoryId)
@@ -489,11 +514,13 @@ class ListDetailViewModel(
 
     fun markChecked(itemId: String, checked: Boolean) {
         viewModelScope.launch {
-            val item = getItemOnceUseCase(itemId)
             markItemCheckedUseCase(itemId, checked, checkedBy = currentUserId)
+            // Re-read after the update so the pushed snapshot carries the new checked/checkedBy state.
+            val item = getItemOnceUseCase(itemId)
             item?.let {
                 val action = if (checked) ListActivityAction.CHECKED_ITEM else ListActivityAction.UNCHECKED_ITEM
                 runCatching { recordActivity(it.listId, currentUserId, action, itemName = it.name) }
+                collaborationSync.pushItem(it.listId, it)
             }
         }
     }
@@ -504,6 +531,7 @@ class ListDetailViewModel(
             deleteItemUseCase(itemId)
             item?.let {
                 runCatching { recordActivity(it.listId, currentUserId, ListActivityAction.DELETED_ITEM, itemName = it.name) }
+                collaborationSync.deleteItem(it.listId, it.itemId)
             }
         }
     }
