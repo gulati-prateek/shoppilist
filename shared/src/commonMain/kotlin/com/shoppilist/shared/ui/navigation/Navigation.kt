@@ -80,7 +80,8 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 onLoginSuccess = { needsProfile ->
                     val next = if (needsProfile) Screen.ProfileSetup.route else Screen.Home.route
                     navController.navigate(next) { popUpTo(0) }
-                }
+                },
+                onAdminLogin = { navController.navigate(Screen.AdminDashboard.route) { popUpTo(0) } }
             )
         }
         composable(Screen.Register.route) {

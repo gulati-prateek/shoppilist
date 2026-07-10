@@ -1,8 +1,10 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.shoppilist.shared.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -185,7 +187,9 @@ fun LoginScreen(
     viewModel: AuthViewModel = koinViewModel(),
     onCreateAccount: () -> Unit = {},
     /** needsProfile = first-time account → the profile-setup form comes before Home. */
-    onLoginSuccess: (needsProfile: Boolean) -> Unit
+    onLoginSuccess: (needsProfile: Boolean) -> Unit,
+    /** A3: hidden admin sign-in — reached by long-pressing the brand; routes to the admin panel. */
+    onAdminLogin: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val uiHost = rememberAuthUiHost()
@@ -195,8 +199,13 @@ fun LoginScreen(
     var phone by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
     var showForgot by remember { mutableStateOf(false) }
+    var adminMode by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.verifiedUser) { if (state.verifiedUser != null) onLoginSuccess(state.needsProfile) }
+    LaunchedEffect(state.verifiedUser) {
+        if (state.verifiedUser != null) {
+            if (adminMode) onAdminLogin() else onLoginSuccess(state.needsProfile)
+        }
+    }
 
     if (showForgot) {
         ForgotPasswordDialog(
@@ -216,11 +225,20 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Branded header — the login screen carries the ShoppiList splash branding (item 4).
-        Text("ShoppiList", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+        // Long-pressing the wordmark switches to the hidden admin sign-in (A3).
         Text(
-            "Shop anything, together",
+            "ShoppiList",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.combinedClickable(
+                onClick = {},
+                onLongClick = { adminMode = true; method = 0 }
+            )
+        )
+        Text(
+            if (adminMode) "Admin sign-in" else "Shop anything, together",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (adminMode) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
 

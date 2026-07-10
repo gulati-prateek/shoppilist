@@ -537,6 +537,16 @@ interface GlobalItemDao {
     @Query("DELETE FROM global_items WHERE region = :region")
     suspend fun deleteByRegion(region: String)
 
+    /** Admin catalog management: items in one category (A4). */
+    @Query("SELECT * FROM global_items WHERE categoryId = :categoryId ORDER BY name ASC")
+    fun getByCategoryFlow(categoryId: String): Flow<List<GlobalItemEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: GlobalItemEntity)
+
+    @Query("DELETE FROM global_items WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<GlobalItemEntity>)
 
@@ -592,6 +602,14 @@ interface GroceryAppDao {
 interface SponsoredRetailerDao {
     @Query("SELECT * FROM sponsored_retailers WHERE countryCode = :countryCode AND isActive = 1 ORDER BY isSponsored DESC, displayOrder ASC")
     fun getForCountry(countryCode: String): Flow<List<SponsoredRetailerEntity>>
+
+    /** All retailers (active or not) for the admin affiliate-config screen. */
+    @Query("SELECT * FROM sponsored_retailers ORDER BY countryCode ASC, displayOrder ASC")
+    fun getAll(): Flow<List<SponsoredRetailerEntity>>
+
+    /** Admin toggle: an affiliate program can be started/closed anytime. */
+    @Query("UPDATE sponsored_retailers SET isActive = :active WHERE id = :id")
+    suspend fun setActive(id: String, active: Boolean)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(retailers: List<SponsoredRetailerEntity>)
