@@ -140,15 +140,16 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 88.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Location first, directly under the ShoppiList top bar (D1).
+                item(key = "location") { LocationChipRow(viewModel) }
                 item(key = "tagline") {
                     Text(
                         "Shop anything, together",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp)
                     )
                 }
                 item(key = "domains") { ShopDomainStrip(onPick = { onCreateList() }) }
-                item(key = "location") { LocationChipRow(viewModel) }
 
                 if (pendingInvites.isNotEmpty()) {
                     item(key = "invites-header") {
@@ -401,7 +402,7 @@ private fun HomeListCard(
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Rename") },
+                            text = { Text("Edit list") },
                             leadingIcon = { Icon(Icons.Default.Edit, null) },
                             onClick = { menuOpen = false; onRename() }
                         )
