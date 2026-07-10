@@ -110,12 +110,7 @@ fun HomeScreen(
                         )
                     }
                 },
-                title = { Text("ShoppiList") },
-                actions = {
-                    IconButton(onClick = onOpenVoice) {
-                        Icon(Icons.Default.Mic, "Voice")
-                    }
-                }
+                title = { Text("ShoppiList") }
             )
         },
         floatingActionButton = {

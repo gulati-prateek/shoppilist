@@ -14,7 +14,8 @@ val viewModelModule = module {
         ListDetailViewModel(
             get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
             get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
-            get(), get(), get(), get(), get(), get(), get()
+            get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+            get(), get(), get()
         )
     }
     viewModel { AssignmentsViewModel(get(), get(), get(), get()) }

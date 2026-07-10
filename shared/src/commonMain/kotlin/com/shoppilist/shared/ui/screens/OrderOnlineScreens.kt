@@ -32,22 +32,14 @@ private fun RetailerTile(
             // Brand-colored monogram tile (we don't bundle trademarked logos).
             com.shoppilist.shared.ui.components.VendorIcon(name = retailer.name, size = 40.dp)
             Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    retailer.name,
-                    fontWeight = FontWeight.Medium,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (retailer.isSponsored) {
-                    Text(
-                        "Sponsored",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SponsoredAmber
-                    )
-                }
-            }
+            Text(
+                retailer.name,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

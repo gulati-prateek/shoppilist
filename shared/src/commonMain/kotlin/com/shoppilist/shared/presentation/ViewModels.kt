@@ -9,7 +9,10 @@ import com.shoppilist.shared.auth.AuthUser
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.backend.RemoteInvite
+import com.shoppilist.shared.data.local.GlobalItemDao
 import com.shoppilist.shared.data.local.InvitationEntity
+import com.shoppilist.shared.data.local.ItemCategoryDao
+import com.shoppilist.shared.data.local.ItemHistoryDao
 import com.shoppilist.shared.data.local.ListActivityAction
 import com.shoppilist.shared.data.local.ListRole
 import com.shoppilist.shared.data.local.ShoppingItemEntity
@@ -379,6 +382,7 @@ class ListDetailViewModel(
     private val getListItemsUseCase: GetListItemsUseCase,
     private val getMyItemsUseCase: GetMyItemsUseCase,
     private val addItemUseCase: AddItemUseCase,
+    private val updateItemUseCase: UpdateItemUseCase,
     private val markItemCheckedUseCase: MarkItemCheckedUseCase,
     private val deleteItemUseCase: DeleteItemUseCase,
     private val clearPurchasedUseCase: ClearPurchasedUseCase,
@@ -401,7 +405,12 @@ class ListDetailViewModel(
     private val recordActivity: RecordActivityUseCase,
     private val collaborationSync: CollaborationSyncManager,
     private val userDao: com.shoppilist.shared.data.local.UserDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val globalItemDao: GlobalItemDao,
+    private val itemCategoryDao: ItemCategoryDao,
+    private val itemHistoryDao: ItemHistoryDao,
+    private val resolveCatalogRegion: ResolveCatalogRegionUseCase,
+    private val syncCatalog: SyncCatalogUseCase
 ) : ViewModel() {
 
     val currentUserId: String get() = sessionManager.requireUserId()
@@ -538,6 +547,64 @@ class ListDetailViewModel(
 
     fun clearPurchased(listId: String) {
         viewModelScope.launch { clearPurchasedUseCase(listId) }
+    }
+
+    /** Increment/decrement an item's quantity (never below 1). */
+    fun changeQuantity(itemId: String, delta: Double) {
+        viewModelScope.launch {
+            val item = getItemOnceUseCase(itemId) ?: return@launch
+            val newQty = (item.quantity + delta).coerceAtLeast(1.0)
+            val updated = item.copy(quantity = newQty)
+            updateItemUseCase(updated)
+            collaborationSync.pushItem(item.listId, updated)
+        }
+    }
+
+    /** Edit an item's quantity / unit / notes from the edit dialog. */
+    fun updateItemDetails(itemId: String, quantity: Double, unit: String?, notes: String?) {
+        viewModelScope.launch {
+            val item = getItemOnceUseCase(itemId) ?: return@launch
+            val updated = item.copy(quantity = quantity.coerceAtLeast(1.0), unit = unit, notes = notes)
+            updateItemUseCase(updated)
+            runCatching { recordActivity(item.listId, currentUserId, ListActivityAction.EDITED_ITEM, itemName = item.name) }
+            collaborationSync.pushItem(item.listId, updated)
+        }
+    }
+
+    // --- Browse-catalog picker (add items to an existing list, same source as create-list) ---
+    private val _catalogSections = MutableStateFlow<List<CatalogSection>>(emptyList())
+    val catalogSections: StateFlow<List<CatalogSection>> = _catalogSections
+
+    private val _catalogFrequentItems = MutableStateFlow<List<String>>(emptyList())
+    val catalogFrequentItems: StateFlow<List<String>> = _catalogFrequentItems
+
+    private val _catalogLoading = MutableStateFlow(false)
+    val catalogLoading: StateFlow<Boolean> = _catalogLoading
+
+    /** Loads the region catalog once for the "Browse items" picker (cached after first open). */
+    fun loadCatalog() {
+        if (_catalogSections.value.isNotEmpty() || _catalogLoading.value) return
+        viewModelScope.launch {
+            _catalogLoading.value = true
+            val userId = currentUserId
+            val region = resolveCatalogRegion()
+            runCatching { syncCatalog(region) } // offline → cached/seed rows still render
+            val regions = if (region == CatalogRegion.GLOBAL) listOf(CatalogRegion.GLOBAL)
+            else listOf(CatalogRegion.GLOBAL, region)
+            val countryCode = sessionManager.lastLocation()?.countryCode
+                ?: userDao.getUserOnce(userId)?.countryCode
+            val itemsByCategory = globalItemDao.getByRegions(regions)
+                .filter { countryCode == null || it.countryCodes.isEmpty() || it.countryCodes.contains(countryCode) }
+                .groupBy { it.categoryId }
+            val categories = itemCategoryDao.getGlobalCategories().first()
+            _catalogFrequentItems.value = itemHistoryDao.getTopItemNames(userId, limit = 20).map { it.itemName }
+            _catalogSections.value = categories.mapNotNull { category ->
+                itemsByCategory[category.categoryId]
+                    ?.map { it.name }?.distinct()?.sorted()
+                    ?.let { names -> CatalogSection(category, names) }
+            }
+            _catalogLoading.value = false
+        }
     }
 
     fun assignToSelf(itemId: String, itemName: String, listName: String) {

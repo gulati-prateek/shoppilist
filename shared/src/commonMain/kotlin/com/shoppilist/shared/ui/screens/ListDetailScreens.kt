@@ -18,11 +18,13 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +36,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.ItemCategoryEntity
@@ -91,6 +95,9 @@ fun ListDetailScreen(
     val leftoverPrompt by viewModel.leftoverPrompt.collectAsState()
     val groceryApps by viewModel.groceryApps.collectAsState()
     val groceryCardDismissed by viewModel.groceryCardDismissed.collectAsState()
+    val catalogSections by viewModel.catalogSections.collectAsState()
+    val catalogFrequentItems by viewModel.catalogFrequentItems.collectAsState()
+    val catalogLoading by viewModel.catalogLoading.collectAsState()
 
     val haptic = LocalHapticFeedback.current
     val currentUserId = viewModel.currentUserId
@@ -107,6 +114,8 @@ fun ListDetailScreen(
     var subListName by remember { mutableStateOf("") }
     var leftoverName by remember { mutableStateOf("") }
     var assigneeTargetItem by remember { mutableStateOf<ShoppingItemEntity?>(null) }
+    var editTargetItem by remember { mutableStateOf<ShoppingItemEntity?>(null) }
+    var showCatalogPicker by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var currentUserName by remember { mutableStateOf("You") }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -230,12 +239,9 @@ fun ListDetailScreen(
             MembersRosterRow(
                 members = members,
                 resolveName = { viewModel.resolveUserName(it) },
-                onOrderOnline = { onOrderWholeList(listId) }
+                onOrderOnline = { onOrderWholeList(listId) },
+                onDoneShopping = { viewModel.doneShopping(listId, list?.name ?: "") }
             )
-
-            if (!groceryCardDismissed && groceryApps.isNotEmpty()) {
-                GroceryAppsCard(apps = groceryApps, onDismiss = { viewModel.dismissGroceryCard() })
-            }
 
             AddItemSection(
                 itemName = itemName,
@@ -266,12 +272,19 @@ fun ListDetailScreen(
                 }
             )
 
-            if (suggestions.isNotEmpty()) {
-                SuggestionChipsRow(
-                    suggestions = suggestions,
-                    onSelect = { name -> viewModel.addItem(listId, name) },
-                    onDismiss = { viewModel.dismissSuggestion(it) }
-                )
+            // Browse the region catalog to add items without typing each one.
+            OutlinedButton(
+                onClick = {
+                    showCatalogPicker = true
+                    viewModel.loadCatalog()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Icon(Icons.Default.Checklist, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Browse items to add")
             }
 
             val modes = ListViewMode.entries.toList()
@@ -323,7 +336,9 @@ fun ListDetailScreen(
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
-                        staged = stagedForCart
+                        staged = stagedForCart,
+                        onEdit = { editTargetItem = it },
+                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
                     )
                     ListViewMode.AISLE -> AisleModeContent(
                         items = items,
@@ -336,7 +351,9 @@ fun ListDetailScreen(
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
-                        staged = stagedForCart
+                        staged = stagedForCart,
+                        onEdit = { editTargetItem = it },
+                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
                     )
                     ListViewMode.MY_ITEMS -> AisleModeContent(
                         items = myItems,
@@ -349,23 +366,17 @@ fun ListDetailScreen(
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
-                        staged = stagedForCart
+                        staged = stagedForCart,
+                        onEdit = { editTargetItem = it },
+                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (hasChecked) {
+            if (hasChecked) {
+                Row(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                     OutlinedButton(onClick = { viewModel.clearPurchased(listId) }) { Text("Clear Purchased") }
-                } else {
-                    Spacer(Modifier.width(1.dp))
                 }
-                Button(onClick = { viewModel.doneShopping(listId, list?.name ?: "") }) { Text("Done Shopping") }
             }
         }
     }
@@ -476,6 +487,228 @@ fun ListDetailScreen(
             onDismiss = { assigneeTargetItem = null }
         )
     }
+
+    val editItem = editTargetItem
+    if (editItem != null) {
+        EditItemDialog(
+            item = editItem,
+            onSave = { qty, unitValue, notesValue ->
+                viewModel.updateItemDetails(editItem.itemId, qty, unitValue, notesValue)
+                editTargetItem = null
+            },
+            onAssign = {
+                assigneeTargetItem = editItem
+                editTargetItem = null
+            },
+            onDismiss = { editTargetItem = null }
+        )
+    }
+
+    if (showCatalogPicker) {
+        val existingNames = remember(items) { items.map { it.name.trim().lowercase() }.toSet() }
+        CatalogPickerSheet(
+            loading = catalogLoading,
+            sections = catalogSections,
+            frequentItems = catalogFrequentItems,
+            existingNames = existingNames,
+            onAdd = { name -> viewModel.addItem(listId, name) },
+            onDismiss = { showCatalogPicker = false }
+        )
+    }
+}
+
+@Composable
+private fun CatalogPickerSheet(
+    loading: Boolean,
+    sections: List<com.shoppilist.shared.presentation.CatalogSection>,
+    frequentItems: List<String>,
+    existingNames: Set<String>,
+    onAdd: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Names added during this picker session (so the row shows a persistent "Added" state).
+    var addedThisSession by remember { mutableStateOf(setOf<String>()) }
+    var search by remember { mutableStateOf("") }
+    val query = search.trim().lowercase()
+
+    val visibleFrequent = if (query.isEmpty()) frequentItems else frequentItems.filter { it.contains(query) }
+    val visibleSections = sections.mapNotNull { section ->
+        val visible = if (query.isEmpty()) section.itemNames else section.itemNames.filter { it.contains(query) }
+        if (visible.isNotEmpty()) section to visible else null
+    }
+
+    fun addName(name: String) {
+        onAdd(name)
+        addedThisSession = addedThisSession + name.trim().lowercase()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close") }
+                    Text("Browse items", style = MaterialTheme.typography.titleLarge)
+                }
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = { Text("Search items") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                if (loading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    if (visibleFrequent.isNotEmpty()) {
+                        item(key = "cat-frequent-header") { CatalogPickerHeader("⭐", "Frequently Added") }
+                        items(visibleFrequent, key = { "cat-frequent-$it" }) { name ->
+                            CatalogPickerRow(
+                                name = name,
+                                added = name.trim().lowercase() in addedThisSession,
+                                alreadyInList = name.trim().lowercase() in existingNames,
+                                onAdd = { addName(name) }
+                            )
+                        }
+                    }
+                    visibleSections.forEach { (section, visible) ->
+                        item(key = "cat-header-${section.category.categoryId}") {
+                            CatalogPickerHeader(section.category.emoji, section.category.name)
+                        }
+                        items(visible, key = { "cat-${section.category.categoryId}-$it" }) { name ->
+                            CatalogPickerRow(
+                                name = name,
+                                added = name.trim().lowercase() in addedThisSession,
+                                alreadyInList = name.trim().lowercase() in existingNames,
+                                onAdd = { addName(name) }
+                            )
+                        }
+                    }
+                    if (!loading && visibleFrequent.isEmpty() && visibleSections.isEmpty()) {
+                        item(key = "cat-empty") {
+                            Text(
+                                if (query.isEmpty()) "No catalog items available yet." else "No items match \"$search\".",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.End) {
+                    Button(onClick = onDismiss) { Text("Done") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogPickerHeader(emoji: String, name: String) {
+    Text(
+        "$emoji  $name",
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun CatalogPickerRow(
+    name: String,
+    added: Boolean,
+    alreadyInList: Boolean,
+    onAdd: () -> Unit
+) {
+    val done = added || alreadyInList
+    ListItem(
+        headlineContent = {
+            Text(name.replaceFirstChar { it.uppercase() })
+        },
+        leadingContent = {
+            com.shoppilist.shared.ui.components.ItemIcon(name = name, categoryId = null, size = 36.dp)
+        },
+        trailingContent = {
+            if (done) {
+                Text(
+                    if (alreadyInList && !added) "In list" else "Added",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            } else {
+                IconButton(onClick = onAdd) { Icon(Icons.Default.Add, "Add $name") }
+            }
+        },
+        modifier = if (done) Modifier else Modifier.clickable(onClick = onAdd)
+    )
+}
+
+@Composable
+private fun EditItemDialog(
+    item: ShoppingItemEntity,
+    onSave: (Double, String?, String?) -> Unit,
+    onAssign: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var quantity by remember(item.itemId) { mutableStateOf(formatQty(item.quantity)) }
+    var unit by remember(item.itemId) { mutableStateOf(item.unit ?: "") }
+    var notes by remember(item.itemId) { mutableStateOf(item.notes ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit ${item.name}") },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = { quantity = it },
+                        label = { Text("Qty") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(90.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = unit,
+                        onValueChange = { unit = it },
+                        label = { Text("Unit") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onAssign) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Assign to person")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    quantity.toDoubleOrNull() ?: item.quantity,
+                    unit.trim().ifBlank { null },
+                    notes.trim().ifBlank { null }
+                )
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -636,7 +869,9 @@ private fun GroupedListModeContent(
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
     resolveName: suspend (String) -> String? = { null },
-    staged: Set<String> = emptySet()
+    staged: Set<String> = emptySet(),
+    onEdit: (ShoppingItemEntity) -> Unit = {},
+    onQuantityChange: (String, Double) -> Unit = { _, _ -> }
 ) {
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     val unchecked = items.filter { !it.checked }
@@ -660,7 +895,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
                 }
             }
         }
@@ -680,7 +915,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { "c_${it.itemId}" }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
                 }
             }
         }
@@ -699,7 +934,9 @@ private fun AisleModeContent(
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
     resolveName: suspend (String) -> String? = { null },
-    staged: Set<String> = emptySet()
+    staged: Set<String> = emptySet(),
+    onEdit: (ShoppingItemEntity) -> Unit = {},
+    onQuantityChange: (String, Double) -> Unit = { _, _ -> }
 ) {
     val groups = remember(items, categoryById) { groupByCategory(items, categoryById) }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -714,7 +951,7 @@ private fun AisleModeContent(
                 }
             }
             items(group.items, key = { it.itemId }) { itemEntity ->
-                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
+                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
             }
         }
     }
@@ -725,7 +962,8 @@ private fun AisleModeContent(
 private fun MembersRosterRow(
     members: List<ListMemberEntity>,
     resolveName: suspend (String) -> String?,
-    onOrderOnline: () -> Unit
+    onOrderOnline: () -> Unit,
+    onDoneShopping: () -> Unit
 ) {
     var names by remember(members) { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(members) {
@@ -757,12 +995,16 @@ private fun MembersRosterRow(
                 }
             }
         }
-        // L7: Order Online button opens the Order Online dashboard for the whole list.
+        // Order Online + Done Shopping sit together.
         AssistChip(
             onClick = onOrderOnline,
             leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp)) },
             label = { Text("Order Online") }
         )
+        Spacer(Modifier.width(8.dp))
+        Button(onClick = onDoneShopping, contentPadding = PaddingValues(horizontal = 12.dp)) {
+            Text("Done Shopping")
+        }
     }
 }
 
@@ -778,7 +1020,9 @@ private fun ItemRow(
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
     resolveName: suspend (String) -> String? = { null },
     categoryLabel: String? = null,
-    staged: Set<String> = emptySet()
+    staged: Set<String> = emptySet(),
+    onEdit: (ShoppingItemEntity) -> Unit = {},
+    onQuantityChange: (String, Double) -> Unit = { _, _ -> }
 ) {
     val isStaged = item.itemId in staged
     // Item 15: show who marked this item purchased ("✓ by Alice").
@@ -861,6 +1105,23 @@ private fun ItemRow(
                     categoryId = item.categoryId,
                     size = 40.dp
                 )
+            }
+        },
+        trailingContent = if (selectMode) null else {
+            {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Quantity steppers (never below 1).
+                    IconButton(onClick = { onQuantityChange(item.itemId, -1.0) }, enabled = item.quantity > 1.0) {
+                        Icon(Icons.Default.Remove, "Decrease quantity")
+                    }
+                    Text(formatQty(item.quantity), style = MaterialTheme.typography.bodyMedium)
+                    IconButton(onClick = { onQuantityChange(item.itemId, 1.0) }) {
+                        Icon(Icons.Default.Add, "Increase quantity")
+                    }
+                    IconButton(onClick = { onEdit(item) }) {
+                        Icon(Icons.Default.Edit, "Edit item")
+                    }
+                }
             }
         },
         modifier = Modifier
