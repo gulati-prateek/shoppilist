@@ -75,27 +75,30 @@ jobs:
           xcrun simctl install "$UDID" "$APP_PATH"
           LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" "$BUNDLE_ID")
           echo "$LAUNCH_OUTPUT"
-          APP_PID=$(echo "$LAUNCH_OUTPUT" | grep -oE '[0-9]+$')
-          echo "App PID: $APP_PID"
 
           sleep 5
 
           xcrun simctl io "$UDID" screenshot launch-screenshot.png || true
 
-          # Simulator apps run as real macOS processes on the host -- checking the PID directly
-          # is more reliable than `launchctl list` (which doesn't reflect RunningBoard-managed
-          # foreground app processes on modern iOS Simulator runtimes).
-          if kill -0 "$APP_PID" 2>/dev/null; then
-            echo "App is still running (PID $APP_PID) 5s after launch -- smoke test passed."
+          # Liveness check: the PID that `simctl launch` prints is NOT reliable to check from the
+          # host with `kill -0` (it's the simulator-internal PID / the process gets re-parented),
+          # which produced false negatives even while the app was clearly alive and rendering.
+          # Simulator apps ARE real host processes, so match the app's executable path directly.
+          if pgrep -f "iosApp.app/iosApp" >/dev/null 2>&1; then
+            echo "App is still running 5s after launch -- smoke test passed."
           else
-            echo "App (PID $APP_PID) is NOT running 5s after launch -- it crashed or exited."
+            echo "App is NOT running 5s after launch -- it crashed or exited."
 
             # Kotlin/Native prints uncaught-exception stack traces to STDERR, which the unified
-            # os_log (`log show`) does NOT capture. Relaunch attached to a console pty so that
-            # stderr (and thus the real crash reason) is captured.
+            # os_log (`log show`) does NOT capture. Relaunch attached to a console pty so stderr
+            # (the real crash reason) is captured. macOS has no GNU `timeout`, so background it
+            # and kill after a grace period instead.
             echo "--- Relaunching with console capture (stdout/stderr) ---"
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-            timeout 25 xcrun simctl launch --console-pty "$UDID" "$BUNDLE_ID" 2>&1 | tee app-console.log || true
+            ( xcrun simctl launch --console-pty "$UDID" "$BUNDLE_ID" >app-console.log 2>&1 & echo $! >console.pid )
+            sleep 20
+            kill "$(cat console.pid)" 2>/dev/null || true
+            echo "=== app console ==="; cat app-console.log || true
 
             echo "--- Recent unified log for the app process ---"
             xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "iosApp"' 2>/dev/null | tail -60 || true
