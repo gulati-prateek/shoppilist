@@ -55,16 +55,20 @@ private val ITEM_KEYWORD_EMOJI: List<Pair<String, String>> = listOf(
     "medicine" to "💊", "vitamin" to "💊", "bandage" to "🩹"
 )
 
-/** Best-effort emoji for an item, from its name first (keyword match), then its category. */
-fun emojiForItem(name: String, categoryId: String?): String {
+/**
+ * Best-effort emoji for an item — a specific name-keyword match first, then the item's category
+ * icon. Returns null when neither matches (L11: rather show a blank thumbnail than a misleading one).
+ */
+fun emojiForItem(name: String, categoryId: String?): String? {
     val lower = name.lowercase()
     ITEM_KEYWORD_EMOJI.firstOrNull { lower.contains(it.first) }?.let { return it.second }
-    return categoryId?.let { CATEGORY_EMOJI[it] } ?: "🛒"
+    return categoryId?.let { CATEGORY_EMOJI[it] }
 }
 
-/** A rounded thumbnail showing the item's emoji on a soft surface — used on list rows. */
+/** A rounded thumbnail showing the item's emoji on a soft surface; blank when no good match (L11). */
 @Composable
 fun ItemIcon(name: String, categoryId: String?, modifier: Modifier = Modifier, size: Dp = 40.dp) {
+    val emoji = emojiForItem(name, categoryId)
     Box(
         modifier = modifier
             .size(size)
@@ -72,6 +76,6 @@ fun ItemIcon(name: String, categoryId: String?, modifier: Modifier = Modifier, s
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        Text(emojiForItem(name, categoryId), fontSize = (size.value * 0.5f).sp)
+        if (emoji != null) Text(emoji, fontSize = (size.value * 0.5f).sp)
     }
 }

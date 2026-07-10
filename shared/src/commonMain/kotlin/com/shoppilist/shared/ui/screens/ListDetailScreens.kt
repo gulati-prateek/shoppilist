@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -109,6 +110,8 @@ fun ListDetailScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var currentUserName by remember { mutableStateOf("You") }
     var showRenameDialog by remember { mutableStateOf(false) }
+    // L3/L8: To-Get items ticked but not yet moved to Cart (explicit "Move to Cart" step).
+    var stagedForCart by remember { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(listId) {
         viewModel.markPresent(listId)
@@ -191,6 +194,21 @@ fun ListDetailScreen(
                         Text("Group into Sub-list (${selectedIds.size})")
                     }
                 }
+            } else if (stagedForCart.isNotEmpty()) {
+                // L3/L8: commit the staged To-Get items into the Cart in one explicit step.
+                BottomAppBar {
+                    Button(
+                        onClick = {
+                            stagedForCart.forEach { viewModel.markChecked(it, true) }
+                            stagedForCart = emptySet()
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Move to Cart (${stagedForCart.size})")
+                    }
+                }
             }
         }
     ) { padding ->
@@ -212,7 +230,7 @@ fun ListDetailScreen(
             MembersRosterRow(
                 members = members,
                 resolveName = { viewModel.resolveUserName(it) },
-                onAddPeople = { onInvite(listId) }
+                onOrderOnline = { onOrderWholeList(listId) }
             )
 
             if (!groceryCardDismissed && groceryApps.isNotEmpty()) {
@@ -279,11 +297,15 @@ fun ListDetailScreen(
                 }
             }
 
+            // Ticking a To-Get item stages it (L3/L8) — it moves to Cart only via the bottom-bar step.
             val onCheck: (ShoppingItemEntity) -> Unit = { item ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                viewModel.markChecked(item.itemId, true)
+                stagedForCart = if (item.itemId in stagedForCart) stagedForCart - item.itemId else stagedForCart + item.itemId
             }
-            val onUncheck: (ShoppingItemEntity) -> Unit = { item -> viewModel.markChecked(item.itemId, false) }
+            val onUncheck: (ShoppingItemEntity) -> Unit = { item ->
+                stagedForCart = stagedForCart - item.itemId
+                viewModel.markChecked(item.itemId, false)
+            }
             val onToggleSelect: (String) -> Unit = { id ->
                 selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
             }
@@ -300,7 +322,8 @@ fun ListDetailScreen(
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
-                        resolveName = { viewModel.resolveUserName(it) }
+                        resolveName = { viewModel.resolveUserName(it) },
+                        staged = stagedForCart
                     )
                     ListViewMode.AISLE -> AisleModeContent(
                         items = items,
@@ -312,7 +335,8 @@ fun ListDetailScreen(
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
-                        resolveName = { viewModel.resolveUserName(it) }
+                        resolveName = { viewModel.resolveUserName(it) },
+                        staged = stagedForCart
                     )
                     ListViewMode.MY_ITEMS -> AisleModeContent(
                         items = myItems,
@@ -324,7 +348,8 @@ fun ListDetailScreen(
                         onUncheck = onUncheck,
                         onOpenItem = onOpenItem,
                         onOpenAssignee = { assigneeTargetItem = it },
-                        resolveName = { viewModel.resolveUserName(it) }
+                        resolveName = { viewModel.resolveUserName(it) },
+                        staged = stagedForCart
                     )
                 }
             }
@@ -610,7 +635,8 @@ private fun GroupedListModeContent(
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
-    resolveName: suspend (String) -> String? = { null }
+    resolveName: suspend (String) -> String? = { null },
+    staged: Set<String> = emptySet()
 ) {
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     val unchecked = items.filter { !it.checked }
@@ -634,7 +660,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
                 }
             }
         }
@@ -654,7 +680,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { "c_${it.itemId}" }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
                 }
             }
         }
@@ -672,7 +698,8 @@ private fun AisleModeContent(
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
-    resolveName: suspend (String) -> String? = { null }
+    resolveName: suspend (String) -> String? = { null },
+    staged: Set<String> = emptySet()
 ) {
     val groups = remember(items, categoryById) { groupByCategory(items, categoryById) }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -687,7 +714,7 @@ private fun AisleModeContent(
                 }
             }
             items(group.items, key = { it.itemId }) { itemEntity ->
-                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
+                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged)
             }
         }
     }
@@ -698,7 +725,7 @@ private fun AisleModeContent(
 private fun MembersRosterRow(
     members: List<ListMemberEntity>,
     resolveName: suspend (String) -> String?,
-    onAddPeople: () -> Unit
+    onOrderOnline: () -> Unit
 ) {
     var names by remember(members) { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(members) {
@@ -712,21 +739,29 @@ private fun MembersRosterRow(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy((-8).dp), modifier = Modifier.weight(1f)) {
-            members.take(6).forEach { m ->
-                val name = names[m.userId]
-                com.shoppilist.shared.ui.components.ProfileAvatar(
-                    initial = name?.firstOrNull()?.toString(),
-                    seed = m.userId,
-                    size = 30.dp,
-                    modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
-                )
+        // L5: contributors on this list (Add-People lives only on the top bar now — L6).
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Contributing", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+                members.take(6).forEach { m ->
+                    val name = names[m.userId]
+                    com.shoppilist.shared.ui.components.ProfileAvatar(
+                        initial = name?.firstOrNull()?.toString(),
+                        seed = m.userId,
+                        size = 30.dp,
+                        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
+                    )
+                }
+                if (members.isEmpty()) {
+                    Text("Just you", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
+        // L7: Order Online button opens the Order Online dashboard for the whole list.
         AssistChip(
-            onClick = onAddPeople,
-            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp)) },
-            label = { Text("Add people") }
+            onClick = onOrderOnline,
+            leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            label = { Text("Order Online") }
         )
     }
 }
@@ -742,8 +777,10 @@ private fun ItemRow(
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
     resolveName: suspend (String) -> String? = { null },
-    categoryLabel: String? = null
+    categoryLabel: String? = null,
+    staged: Set<String> = emptySet()
 ) {
+    val isStaged = item.itemId in staged
     // Item 15: show who marked this item purchased ("✓ by Alice").
     var checkedByName by remember(item.itemId, item.checkedBy) { mutableStateOf<String?>(null) }
     LaunchedEffect(item.checkedBy, item.checked) {
@@ -782,12 +819,24 @@ private fun ItemRow(
                 }
                 val notes = item.notes
                 if (!notes.isNullOrBlank()) Text(notes, style = MaterialTheme.typography.bodySmall)
-                if (item.checked && checkedByName != null) {
-                    Text(
-                        "✓ by $checkedByName",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                if (item.checked) {
+                    // L2: a visible way to move a Cart item back to To-Get (not just long-press).
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (checkedByName != null) {
+                            Text(
+                                "✓ by $checkedByName",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            "↩ Move to To-Get",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.clickable { onUncheck(item) }
+                        )
+                    }
                 } else {
                     Text(
                         text = if (item.assignedTo != null) "Assigned" else "+ Assign",
@@ -800,13 +849,12 @@ private fun ItemRow(
         },
         leadingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (selectMode) {
-                    Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect(item.itemId) })
-                } else {
-                    Checkbox(
-                        checked = item.checked,
-                        onCheckedChange = { newValue -> if (newValue) onCheck(item) }
-                    )
+                when {
+                    selectMode -> Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect(item.itemId) })
+                    item.checked -> Checkbox(checked = true, onCheckedChange = { onUncheck(item) })
+                    // L3/L8: ticking a To-Get item STAGES it (doesn't move to Cart); the explicit
+                    // "Move to Cart" bottom-bar step commits the staged items.
+                    else -> Checkbox(checked = isStaged, onCheckedChange = { onCheck(item) })
                 }
                 com.shoppilist.shared.ui.components.ItemIcon(
                     name = item.name,
@@ -829,10 +877,10 @@ private fun ItemRow(
                     if (!selectMode && item.checked) onUncheck(item)
                 }
             ),
-        colors = if (isSelected && selectMode) {
-            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        } else {
-            ListItemDefaults.colors()
+        colors = when {
+            isSelected && selectMode -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            isStaged -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            else -> ListItemDefaults.colors()
         }
     )
 }
