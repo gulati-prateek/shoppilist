@@ -53,6 +53,7 @@ interface OfflineOpManager {
 
 class RoomShoppingListRepository(
     private val listDao: ShoppingListDao,
+    private val itemDao: ShoppingItemDao,
     private val opManager: OfflineOpManager
 ) : ShoppingListRepository {
 
@@ -125,6 +126,13 @@ class RoomShoppingListRepository(
 
     override suspend fun deleteList(listId: String): Result<Unit> {
         return try {
+            // No FK cascade on the schema — clean up items and sub-lists explicitly
+            // so deleting a list doesn't leave orphaned rows behind.
+            listDao.getSubListIdsOnce(listId).forEach { subListId ->
+                itemDao.deleteAllForList(subListId)
+                listDao.delete(subListId)
+            }
+            itemDao.deleteAllForList(listId)
             listDao.delete(listId)
             opManager.queueOp(
                 PendingOpEntity(

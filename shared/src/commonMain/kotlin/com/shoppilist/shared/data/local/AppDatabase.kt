@@ -53,6 +53,11 @@ data class UserEntity(
     val city: String?,
     val pincode: String?,
     val profileImageUrl: String?,
+    // Structured name from the profile-setup form; fullName stays the display fallback for
+    // accounts created before the form existed. A null firstName marks the profile incomplete.
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val address: String? = null,
     val countryCode: String? = null,
     val languageCode: String? = null,
     val hideSponsoredLinks: Boolean = false,
@@ -164,8 +169,10 @@ data class CategoryCorrectionEntity(
     val createdAt: Long = currentTimeMillis()
 )
 
-/** Curated global item database (§2.9) — a representative seed, not the full 5,000+ catalog. */
-@Entity(tableName = "global_items", indices = [Index("name")])
+/** Master item catalog. The bundled seed rows carry region "GLOBAL" and are never deleted;
+ *  region "IN"/"US"/"EU" rows are a local cache of the Firestore catalog for the user's
+ *  region and get replaced wholesale on each sync (§ backend catalog). */
+@Entity(tableName = "global_items", indices = [Index("name"), Index("region")])
 data class GlobalItemEntity(
     @PrimaryKey val id: String,
     val name: String,
@@ -173,7 +180,8 @@ data class GlobalItemEntity(
     val countryCodes: List<String> = emptyList(),
     val languageTranslations: Map<String, String> = emptyMap(),
     val isSeasonal: Boolean = false,
-    val seasonMonths: List<String> = emptyList()
+    val seasonMonths: List<String> = emptyList(),
+    val region: String = "GLOBAL"
 )
 
 /** Per-user purchase history, feeding the suggestion engine (§2.8). */
@@ -398,6 +406,9 @@ interface ShoppingListDao {
 
     @Query("DELETE FROM shopping_lists WHERE listId = :id")
     suspend fun delete(id: String)
+
+    @Query("SELECT listId FROM shopping_lists WHERE parentListId = :parentListId")
+    suspend fun getSubListIdsOnce(parentListId: String): List<String>
 }
 
 @Dao
@@ -494,6 +505,13 @@ interface GlobalItemDao {
 
     @Query("SELECT * FROM global_items WHERE isSeasonal = 1")
     suspend fun getSeasonalItems(): List<GlobalItemEntity>
+
+    /** Catalog browse for the create-list picker: the user's region plus the GLOBAL base set. */
+    @Query("SELECT * FROM global_items WHERE region IN (:regions) ORDER BY name")
+    suspend fun getByRegions(regions: List<String>): List<GlobalItemEntity>
+
+    @Query("DELETE FROM global_items WHERE region = :region")
+    suspend fun deleteByRegion(region: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<GlobalItemEntity>)
@@ -659,7 +677,7 @@ interface PendingOpDao {
         AffiliateClickEntity::class,
         PendingOpEntity::class
     ],
-    version = 2,
+    version = 4,
     // Schema export across multiple KMP compile targets needs extra Gradle-side wiring this
     // project doesn't have yet; the project already relies on fallbackToDestructiveMigration()
     // instead of real migrations, so schema history files aren't load-bearing here.

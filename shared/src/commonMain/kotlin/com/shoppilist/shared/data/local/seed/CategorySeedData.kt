@@ -18,9 +18,31 @@ object CategoryIds {
     const val PET_CARE = "pet_care"
     const val HEALTH_PHARMACY = "health_pharmacy"
     const val SPICES_CONDIMENTS = "spices_condiments"
+
+    // Non-grocery categories added for the CSV-driven catalog expansion (Electronics/Clothing/
+    // Mall/Home-Household), see CsvCatalogSeedData.
+    const val MOBILE_ACCESSORIES = "mobile_accessories"
+    const val COMPUTERS_LAPTOPS = "computers_laptops"
+    const val HOME_ENTERTAINMENT = "home_entertainment"
+    const val HOME_APPLIANCES = "home_appliances"
+    const val GAMING = "gaming"
+    const val MENS_WEAR = "mens_wear"
+    const val WOMENS_WEAR = "womens_wear"
+    const val KIDS_WEAR = "kids_wear"
+    const val FOOTWEAR = "footwear"
+    const val ETHNIC_WEAR = "ethnic_wear"
+    const val WATCHES_JEWELRY = "watches_jewelry"
+    const val BAGS_ACCESSORIES = "bags_accessories"
+    const val PERFUMES_FRAGRANCES = "perfumes_fragrances"
+    const val GIFTS_STATIONERY = "gifts_stationery"
+    const val KITCHENWARE_COOKWARE = "kitchenware_cookware"
+    const val BEDDING_LINEN = "bedding_linen"
+    const val STORAGE_ORGANIZATION = "storage_organization"
 }
 
-/** The 14 store-aisle-aligned categories from the product spec (§2.12), in default display order. */
+/** The 14 store-aisle-aligned categories from the product spec (§2.12), plus 17 non-grocery
+ *  categories added when the catalog expanded beyond groceries (Electronics/Clothing/Mall/
+ *  Home-Household), in default display order. */
 object CategorySeedData {
     val categories: List<ItemCategoryEntity> = listOf(
         ItemCategoryEntity(CategoryIds.FRESH_PRODUCE, "Fresh Produce", "🥦", 1),
@@ -36,7 +58,24 @@ object CategorySeedData {
         ItemCategoryEntity(CategoryIds.BABY_KIDS, "Baby & Kids", "🍼", 11),
         ItemCategoryEntity(CategoryIds.PET_CARE, "Pet Care", "🐾", 12),
         ItemCategoryEntity(CategoryIds.HEALTH_PHARMACY, "Health & Pharmacy", "💊", 13),
-        ItemCategoryEntity(CategoryIds.SPICES_CONDIMENTS, "Spices & Condiments", "🌶️", 14)
+        ItemCategoryEntity(CategoryIds.SPICES_CONDIMENTS, "Spices & Condiments", "🌶️", 14),
+        ItemCategoryEntity(CategoryIds.MOBILE_ACCESSORIES, "Mobile & Accessories", "📱", 15),
+        ItemCategoryEntity(CategoryIds.COMPUTERS_LAPTOPS, "Computers & Laptops", "💻", 16),
+        ItemCategoryEntity(CategoryIds.HOME_ENTERTAINMENT, "Home Entertainment", "📺", 17),
+        ItemCategoryEntity(CategoryIds.HOME_APPLIANCES, "Home Appliances", "🔌", 18),
+        ItemCategoryEntity(CategoryIds.GAMING, "Gaming", "🎮", 19),
+        ItemCategoryEntity(CategoryIds.MENS_WEAR, "Men's Wear", "👔", 20),
+        ItemCategoryEntity(CategoryIds.WOMENS_WEAR, "Women's Wear", "👗", 21),
+        ItemCategoryEntity(CategoryIds.KIDS_WEAR, "Kids Wear", "🧒", 22),
+        ItemCategoryEntity(CategoryIds.FOOTWEAR, "Footwear", "👟", 23),
+        ItemCategoryEntity(CategoryIds.ETHNIC_WEAR, "Traditional & Ethnic Wear", "🥻", 24),
+        ItemCategoryEntity(CategoryIds.WATCHES_JEWELRY, "Watches & Jewelry", "⌚", 25),
+        ItemCategoryEntity(CategoryIds.BAGS_ACCESSORIES, "Bags & Accessories", "👜", 26),
+        ItemCategoryEntity(CategoryIds.PERFUMES_FRAGRANCES, "Perfumes & Fragrances", "🌸", 27),
+        ItemCategoryEntity(CategoryIds.GIFTS_STATIONERY, "Gifts & Stationery", "🎁", 28),
+        ItemCategoryEntity(CategoryIds.KITCHENWARE_COOKWARE, "Kitchenware & Cookware", "🍳", 29),
+        ItemCategoryEntity(CategoryIds.BEDDING_LINEN, "Bedding & Linen", "🛏️", 30),
+        ItemCategoryEntity(CategoryIds.STORAGE_ORGANIZATION, "Storage & Organization", "🗄️", 31)
     )
 
     /**

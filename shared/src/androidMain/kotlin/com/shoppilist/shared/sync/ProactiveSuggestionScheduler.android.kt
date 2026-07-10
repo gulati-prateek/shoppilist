@@ -48,7 +48,7 @@ class ProactiveSuggestionWorker(ctx: Context, params: WorkerParameters) : Corout
             val useCase = FindMissingFrequentItemsUseCase(
                 suggestionRepo = RoomSuggestionRepository(db.itemHistoryDao(), db.suggestionDismissalDao(), db.globalItemDao()),
                 itemRepo = RoomShoppingItemRepository(db.shoppingItemDao(), opManager),
-                listRepo = RoomShoppingListRepository(db.shoppingListDao(), opManager)
+                listRepo = RoomShoppingListRepository(db.shoppingListDao(), db.shoppingItemDao(), opManager)
             )
 
             val missing = useCase(userId)

@@ -3,6 +3,14 @@ package com.shoppilist.shared.di
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.russhwolf.settings.NSUserDefaultsSettings
+import com.shoppilist.shared.auth.AuthService
+import com.shoppilist.shared.auth.StubAuthService
+import com.shoppilist.shared.backend.AdminBackend
+import com.shoppilist.shared.backend.CatalogBackend
+import com.shoppilist.shared.backend.ProfileBackend
+import com.shoppilist.shared.backend.StubAdminBackend
+import com.shoppilist.shared.backend.StubCatalogBackend
+import com.shoppilist.shared.backend.StubProfileBackend
 import com.shoppilist.shared.data.local.AppDatabase
 import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.sync.IosProactiveSuggestionScheduler
@@ -52,4 +60,10 @@ val iosAppModule = module {
     }
 
     single<ProactiveSuggestionScheduler> { IosProactiveSuggestionScheduler() }
+
+    single<AuthService> { StubAuthService() }
+
+    single<CatalogBackend> { StubCatalogBackend() }
+    single<ProfileBackend> { StubProfileBackend() }
+    single<AdminBackend> { StubAdminBackend() }
 }

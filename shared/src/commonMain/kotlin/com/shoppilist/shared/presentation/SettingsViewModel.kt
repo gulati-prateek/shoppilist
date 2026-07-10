@@ -2,6 +2,9 @@ package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.shoppilist.shared.auth.AuthService
+import com.shoppilist.shared.auth.AuthUser
+import com.shoppilist.shared.backend.AdminBackend
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
@@ -11,13 +14,25 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val userDao: UserDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val authService: AuthService,
+    private val adminBackend: AdminBackend
 ) : ViewModel() {
 
     private val _user = MutableStateFlow<UserEntity?>(null)
     val user: StateFlow<UserEntity?> = _user
 
+    /** Live verification status from the auth backend (issue 8's profile badges). */
+    private val _authUser = MutableStateFlow<AuthUser?>(null)
+    val authUser: StateFlow<AuthUser?> = _authUser
+
+    /** Whether the signed-in account has an `admins/{uid}` marker — gates the Admin card. */
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin: StateFlow<Boolean> = _isAdmin
+
     fun load() {
+        viewModelScope.launch { _authUser.value = authService.currentUser(refresh = true) }
+        viewModelScope.launch { _isAdmin.value = adminBackend.isAdmin(sessionManager.requireUserId()) }
         viewModelScope.launch {
             userDao.getUserFlow(sessionManager.requireUserId()).collect { _user.value = it }
         }

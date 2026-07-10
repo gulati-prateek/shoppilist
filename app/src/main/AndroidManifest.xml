@@ -2,6 +2,17 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Dashboard "current location" + address autofill; coarse alone is accepted at runtime. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Android 11+ package visibility: without this, SpeechRecognizer.isRecognitionAvailable()
+         can't see the system speech service and reports voice input as unavailable. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name="com.shoppilist.ShoppiListApp"
@@ -9,6 +20,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="ShoppiList"
+        android:theme="@style/Theme.ShoppiList"
         android:supportsRtl="true">
         <activity android:name="com.shoppilist.MainActivity"
             android:exported="true">

@@ -11,8 +11,13 @@ import org.koin.dsl.module
 val repositoryModule = module {
 
     single<OfflineOpManager> { RoomOfflineOpManager(get()) }
-    single<ShoppingListRepository> { RoomShoppingListRepository(get(), get()) }
+    single<ShoppingListRepository> { RoomShoppingListRepository(get(), get(), get()) }
     single<ShoppingItemRepository> { RoomShoppingItemRepository(get(), get()) }
+
+    // Account mirror + region catalog sync
+    single { UserAccountSync(get(), get(), get()) }
+    factory { ResolveCatalogRegionUseCase(get(), get()) }
+    factory { SyncCatalogUseCase(get(), get(), get()) }
 
     // UseCases
     factory { GetAllListsUseCase(get()) }
@@ -23,7 +28,7 @@ val repositoryModule = module {
     factory { TogglePinUseCase(get()) }
     factory { GetListItemsUseCase(get()) }
     factory { GetItemOnceUseCase(get()) }
-    factory { AddItemUseCase(get(), get(), get()) }
+    factory { AddItemUseCase(get(), get(), get(), get(), get()) }
     factory { UpdateItemUseCase(get()) }
     factory { DeleteItemUseCase(get()) }
     factory { MarkItemCheckedUseCase(get()) }

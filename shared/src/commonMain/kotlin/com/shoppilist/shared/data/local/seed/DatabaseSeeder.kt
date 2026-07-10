@@ -11,5 +11,6 @@ object DatabaseSeeder {
         db.groceryAppDao().insertAll(GroceryAppSeedData.apps)
         db.sponsoredRetailerDao().insertAll(SponsoredRetailerSeedData.retailers)
         db.globalItemDao().insertAll(GlobalItemSeedData.items)
+        db.globalItemDao().insertAll(CsvCatalogSeedData.items)
     }
 }

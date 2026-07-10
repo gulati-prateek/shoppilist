@@ -1,12 +1,18 @@
 package com.shoppilist.shared.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.savedstate.read
 import com.shoppilist.shared.domain.CountryLanguageData
+import com.shoppilist.shared.presentation.StartDestination
 import com.shoppilist.shared.ui.screens.*
 
 sealed class Screen(val route: String) {
@@ -18,13 +24,11 @@ sealed class Screen(val route: String) {
     }
     object Login : Screen("login")
     object Register : Screen("register")
+    object ProfileSetup : Screen("profile_setup")
     object Home : Screen("home")
     object CreateList : Screen("create_list")
     object ListDetail : Screen("list_detail/{listId}") {
         fun createRoute(listId: String) = "list_detail/$listId"
-    }
-    object AddItem : Screen("add_item/{listId}") {
-        fun createRoute(listId: String) = "add_item/$listId"
     }
     object Voice : Screen("voice")
     object Assignments : Screen("assignments/{listId}") {
@@ -40,6 +44,7 @@ sealed class Screen(val route: String) {
         fun createRoute(listId: String) = "order_list/$listId"
     }
     object Settings : Screen("settings")
+    object AdminDashboard : Screen("admin_dashboard")
 }
 
 @Composable
@@ -48,10 +53,23 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
 
     NavHost(
         navController = navController,
-        startDestination = startScreen
+        startDestination = startScreen,
+        // Keep all screens clear of the system bars: targetSdk 35+ forces edge-to-edge on
+        // Android 15+, and the bare-Column screens (onboarding, auth, voice, settings) have
+        // no inset handling of their own. Insets are consumed here, so Scaffold-based
+        // screens don't double-pad.
+        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         composable(Screen.Splash.route) {
-            SplashScreen { navController.navigate(Screen.Onboarding.route) }
+            SplashScreen { destination ->
+                val route = when (destination) {
+                    StartDestination.HOME -> Screen.Home.route
+                    StartDestination.PROFILE_SETUP -> Screen.ProfileSetup.route
+                    StartDestination.LOGIN -> Screen.Login.route
+                    StartDestination.ONBOARDING -> Screen.Onboarding.route
+                }
+                navController.navigate(route) { popUpTo(0) }
+            }
         }
         composable(Screen.Onboarding.route) {
             OnboardingScreen { navController.navigate(Screen.CountrySelection.route) }
@@ -70,10 +88,27 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             }
         }
         composable(Screen.Login.route) {
-            LoginScreen { navController.navigate(Screen.Home.route) { popUpTo(0) } }
+            LoginScreen(
+                onCreateAccount = { navController.navigate(Screen.Register.route) },
+                onLoginSuccess = { needsProfile ->
+                    val next = if (needsProfile) Screen.ProfileSetup.route else Screen.Home.route
+                    navController.navigate(next) { popUpTo(0) }
+                }
+            )
         }
         composable(Screen.Register.route) {
-            RegisterScreen { navController.navigate(Screen.Home.route) { popUpTo(0) } }
+            RegisterScreen(
+                onLogin = { navController.popBackStack() },
+                onRegisterSuccess = { needsProfile ->
+                    val next = if (needsProfile) Screen.ProfileSetup.route else Screen.Home.route
+                    navController.navigate(next) { popUpTo(0) }
+                }
+            )
+        }
+        composable(Screen.ProfileSetup.route) {
+            ProfileSetupScreen(
+                onDone = { navController.navigate(Screen.Home.route) { popUpTo(0) } }
+            )
         }
         composable(Screen.Home.route) {
             HomeScreen(
@@ -84,7 +119,15 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             )
         }
         composable(Screen.CreateList.route) {
-            CreateListScreen { navController.popBackStack() }
+            CreateListScreen(
+                onBack = { navController.popBackStack() },
+                onCreated = { listId ->
+                    // Land inside the new list; Home stays beneath it on the back stack.
+                    navController.navigate(Screen.ListDetail.createRoute(listId)) {
+                        popUpTo(Screen.Home.route)
+                    }
+                }
+            )
         }
         composable(Screen.ListDetail.route) { backStackEntry ->
             val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
@@ -96,10 +139,6 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 onInvite = { navController.navigate(Screen.Invite.createRoute(listId)) },
                 onBack = { navController.popBackStack() }
             )
-        }
-        composable(Screen.AddItem.route) { backStackEntry ->
-            val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
-            AddItemScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.Voice.route) {
             VoiceScreen(onBack = { navController.popBackStack() })
@@ -127,7 +166,13 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             OrderWholeListScreen(listId = listId, onBack = { navController.popBackStack() })
         }
         composable(Screen.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) }
+            )
+        }
+        composable(Screen.AdminDashboard.route) {
+            AdminDashboardScreen(onBack = { navController.popBackStack() })
         }
     }
 }

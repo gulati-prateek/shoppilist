@@ -91,28 +91,31 @@ list content and no monetization.
 Matches `PRIVACY_POLICY.md`. Fill this into Play Console's Data Safety section.
 
 **Does your app collect or share any of the required user data types?**
-Yes — collected, but not shared with any third party, and not collected via a server (all
-on-device).
+Yes — collected. Account/profile/catalog data is processed by Firebase (Google Cloud) as a
+service provider; it is not shared with third parties for their own purposes.
 
 | Data type | Collected? | Shared with third parties? | Purpose | Optional? |
 |---|---|---|---|---|
-| Name | Yes (local profile display name) | No | App functionality (identify household members) | Yes — used only for shared-list display |
-| Email or phone (if used to identify a household member) | Yes, if entered | No | App functionality | Yes |
-| App activity — in-app actions (list/item data you create) | Yes | No | App functionality (this is the app's core purpose) | No — required for the app to work |
+| Name (first/last on the profile form) | Yes | No (processed by Firebase as service provider) | App functionality, account management | First name required at sign-up; last name optional |
+| Email address / phone number | Yes (sign-in credential; email optional for phone users) | No (Firebase Authentication) | Account management, verification | One of the two is required |
+| Address | Yes, if entered (profile form) | No (Firestore profile mirror) | App functionality (user demographics) | Yes |
+| Approximate & precise location | Yes, only when the user taps the location button and grants permission | No (Firestore profile mirror) | App functionality (dashboard location, per-country catalog) | Yes |
+| App activity — in-app actions (list/item data you create) | Lists/items stay on-device. Item names not found in the master catalog are uploaded for admin review (with user id/display name + country) | No | App functionality (growing the shared item catalog) | No — core purpose |
 | Audio — voice input | Processed transiently by the OS speech recognizer, not stored or transmitted by the app itself | No | App functionality (voice-to-text for adding items) | Yes — voice input is optional, typing works too |
 
 **Is all user data encrypted in transit?**
-Not applicable — the app has no network transmission of user data (no server, no cloud
-sync). Retailer links open in the device browser, which is the browser's own HTTPS
-connection, not app-initiated data transfer.
+Yes — all Firebase traffic (Authentication, Firestore) is HTTPS/TLS. Retailer links open in
+the device browser over that site's own HTTPS connection.
 
 **Do you provide a way for users to request data deletion?**
-Yes, implicitly — uninstalling the app deletes all local data, since there is no
-server-side copy. (Play may ask you to describe this explicitly; use that framing.)
+Yes — uninstalling deletes all local data; account + cloud profile deletion is available on
+request via the privacy-policy contact email. (Play increasingly expects an account-deletion
+web link or in-app flow for apps with account creation — plan an in-app "delete account"
+before wide release.)
 
 **Data collection is required for app functionality?**
-Yes for list/item data (the app's core purpose); voice input and household member contact
-info are optional (typing and using without adding member details both work).
+An account (email or phone) is required. Profile last name, email (for phone users),
+address, and location are optional; voice input is optional (typing works too).
 
 ## Screenshots / feature graphic — not yet produced
 

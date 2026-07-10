@@ -16,6 +16,9 @@ object CountryLanguageData {
         AppLanguage("in", "Bahasa Indonesia", "Bahasa Indonesia")
     )
 
+    /** The 19 countries covered by the bundled CSV catalog (ShoppiList_Item_Catalog.csv), plus
+     *  everywhere else falling back to the GLOBAL catalog. Not stored pre-sorted — pickers sort
+     *  alphabetically by [Country.name] themselves (see CountryPickerList). */
     val countries: List<Country> = listOf(
         Country("IN", "India", "🇮🇳", listOf("en", "hi")),
         Country("US", "United States", "🇺🇸", listOf("en", "es")),
@@ -25,7 +28,17 @@ object CountryLanguageData {
         Country("AU", "Australia", "🇦🇺", listOf("en")),
         Country("SG", "Singapore", "🇸🇬", listOf("en", "in")),
         Country("BR", "Brazil", "🇧🇷", listOf("pt", "en")),
-        Country("FR", "France", "🇫🇷", listOf("fr", "en"))
+        Country("FR", "France", "🇫🇷", listOf("fr", "en")),
+        Country("CN", "China", "🇨🇳", listOf("en")),
+        Country("ID", "Indonesia", "🇮🇩", listOf("in", "en")),
+        Country("IT", "Italy", "🇮🇹", listOf("en")),
+        Country("JP", "Japan", "🇯🇵", listOf("en")),
+        Country("MX", "Mexico", "🇲🇽", listOf("es", "en")),
+        Country("NG", "Nigeria", "🇳🇬", listOf("en")),
+        Country("SA", "Saudi Arabia", "🇸🇦", listOf("ar", "en")),
+        Country("ZA", "South Africa", "🇿🇦", listOf("en")),
+        Country("KR", "South Korea", "🇰🇷", listOf("en")),
+        Country("ES", "Spain", "🇪🇸", listOf("es", "en"))
     )
 
     fun languagesFor(countryCode: String): List<AppLanguage> {

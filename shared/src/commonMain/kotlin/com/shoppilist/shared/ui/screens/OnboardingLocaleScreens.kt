@@ -22,12 +22,34 @@ fun CountrySelectionScreen(onCountrySelected: (Country) -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(stringResource(Res.string.title_select_country), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(16.dp))
+        CountryPickerList(modifier = Modifier.weight(1f), onSelect = onCountrySelected)
+    }
+}
+
+/** Alphabetically-sorted, search-filtered country list — the CSV catalog now covers 19
+ *  countries, too many for a plain unfiltered list. Reused by onboarding and Settings. */
+@Composable
+fun CountryPickerList(modifier: Modifier = Modifier, onSelect: (Country) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    Column(modifier = modifier) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Search country") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
+        val filtered = remember(query) {
+            CountryLanguageData.countries
+                .filter { it.name.contains(query, ignoreCase = true) }
+                .sortedBy { it.name }
+        }
         LazyColumn {
-            items(CountryLanguageData.countries) { country ->
+            items(filtered, key = { it.code }) { country ->
                 ListItem(
                     leadingContent = { Text(country.flag, style = MaterialTheme.typography.headlineSmall) },
                     headlineContent = { Text(country.name) },
-                    modifier = Modifier.clickable { onCountrySelected(country) }
+                    modifier = Modifier.clickable { onSelect(country) }
                 )
                 HorizontalDivider()
             }

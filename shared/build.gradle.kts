@@ -71,6 +71,8 @@ kotlin {
             // Backs the Android actual of ProactiveSuggestionScheduler (WorkManager is Android-only;
             // the iOS actual uses BGTaskScheduler instead).
             implementation("androidx.work:work-runtime-ktx:2.8.1")
+            // Backs the Android actual of LocationController (the iOS actual is a stub).
+            implementation("com.google.android.gms:play-services-location:21.3.0")
         }
     }
 }

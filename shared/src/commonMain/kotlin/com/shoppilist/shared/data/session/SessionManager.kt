@@ -1,6 +1,7 @@
 package com.shoppilist.shared.data.session
 
 import com.russhwolf.settings.Settings
+import com.shoppilist.shared.currentTimeMillis
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -46,11 +47,70 @@ class SessionManager(private val settings: Settings) {
         return country to language
     }
 
+    /** Whether the intro/locale onboarding has been completed once on this device — relaunches
+     *  skip straight to Login instead of replaying the whole intro. */
+    var onboardingDone: Boolean
+        get() = settings.getBoolean(KEY_ONBOARDING_DONE, false)
+        set(value) { settings.putBoolean(KEY_ONBOARDING_DONE, value) }
+
+    /** Last device location the user fetched (dashboard chip). Survives logout deliberately —
+     *  [clear] leaves it so the value is remembered on relogin. */
+    fun setLastLocation(location: StoredLocation) {
+        settings.putDouble(KEY_LOC_LAT, location.latitude)
+        settings.putDouble(KEY_LOC_LNG, location.longitude)
+        settings.putString(KEY_LOC_CITY, location.city.orEmpty())
+        settings.putString(KEY_LOC_STATE, location.state.orEmpty())
+        settings.putString(KEY_LOC_COUNTRY, location.countryCode.orEmpty())
+        settings.putString(KEY_LOC_ADDRESS, location.addressLine.orEmpty())
+        settings.putLong(KEY_LOC_UPDATED, currentTimeMillis())
+    }
+
+    fun lastLocation(): StoredLocation? {
+        val lat = settings.getDoubleOrNull(KEY_LOC_LAT) ?: return null
+        val lng = settings.getDoubleOrNull(KEY_LOC_LNG) ?: return null
+        return StoredLocation(
+            latitude = lat,
+            longitude = lng,
+            city = settings.getStringOrNull(KEY_LOC_CITY)?.takeIf { it.isNotBlank() },
+            state = settings.getStringOrNull(KEY_LOC_STATE)?.takeIf { it.isNotBlank() },
+            countryCode = settings.getStringOrNull(KEY_LOC_COUNTRY)?.takeIf { it.isNotBlank() },
+            addressLine = settings.getStringOrNull(KEY_LOC_ADDRESS)?.takeIf { it.isNotBlank() },
+            updatedAt = settings.getLongOrNull(KEY_LOC_UPDATED)
+        )
+    }
+
+    /** Per-region timestamp of the last successful remote catalog sync. */
+    fun catalogSyncedAt(region: String): Long? = settings.getLongOrNull(KEY_CATALOG_SYNC_PREFIX + region)
+
+    fun setCatalogSyncedAt(region: String, timestamp: Long) {
+        settings.putLong(KEY_CATALOG_SYNC_PREFIX + region, timestamp)
+    }
+
     companion object {
         private const val KEY_USER_ID = "current_user_id"
         private const val KEY_PENDING_COUNTRY = "pending_country_code"
         private const val KEY_PENDING_LANGUAGE = "pending_language_code"
+        private const val KEY_ONBOARDING_DONE = "onboarding_done"
+        private const val KEY_LOC_LAT = "last_location_lat"
+        private const val KEY_LOC_LNG = "last_location_lng"
+        private const val KEY_LOC_CITY = "last_location_city"
+        private const val KEY_LOC_STATE = "last_location_state"
+        private const val KEY_LOC_COUNTRY = "last_location_country"
+        private const val KEY_LOC_ADDRESS = "last_location_address"
+        private const val KEY_LOC_UPDATED = "last_location_updated_at"
+        private const val KEY_CATALOG_SYNC_PREFIX = "catalog_synced_at_"
         // Used only if a screen renders before login (e.g. previews); real flows always set a user first.
         const val FALLBACK_USER_ID = "guest"
     }
 }
+
+/** Location snapshot persisted by [SessionManager.setLastLocation]. */
+data class StoredLocation(
+    val latitude: Double,
+    val longitude: Double,
+    val city: String?,
+    val state: String?,
+    val countryCode: String?,
+    val addressLine: String?,
+    val updatedAt: Long? = null
+)

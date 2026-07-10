@@ -22,18 +22,32 @@ class RuleBasedProcessor : VoiceIntentProcessor {
         val lower = text.trim().lowercase()
         return try {
             when {
-                lower.startsWith("create shopping list") || lower.startsWith("create list") -> {
-                    // "Create shopping list called Monthly Grocery"
-                    val after = lower.substringAfter("called", "").trim()
-                    val name = if (after.isNotEmpty()) after else lower.substringAfter("create shopping list", "").trim()
-                    VoiceIntentResult.Success(VoiceIntent.CreateList(name), text)
+                lower.startsWith("create shopping list") || lower.startsWith("create list") || lower.startsWith("new list") -> {
+                    // "Create shopping list called Monthly Grocery" / "Create list Weekly" / "New list Diwali"
+                    val called = lower.substringAfter("called", "").trim()
+                    val name = called.ifEmpty {
+                        lower.removePrefix("create shopping list")
+                            .removePrefix("create list")
+                            .removePrefix("new list")
+                            .trim()
+                    }
+                    if (name.isEmpty()) {
+                        VoiceIntentResult.Failure("Tell me the list name, e.g. 'Create list called Weekly Groceries'", text)
+                    } else {
+                        VoiceIntentResult.Success(VoiceIntent.CreateList(name), text)
+                    }
                 }
-                lower.startsWith("add ") && lower.contains(" to ") -> {
+                lower.startsWith("add ") -> {
+                    // "Add milk to Weekly Groceries", or just "Add milk" (goes to the most recent list)
                     val after = lower.removePrefix("add ")
                     val parts = after.split(" to ")
                     val item = parts[0].trim()
-                    val list = parts.getOrNull(1)?.trim()
-                    VoiceIntentResult.Success(VoiceIntent.AddItem(list, item), text)
+                    val list = parts.getOrNull(1)?.trim()?.ifEmpty { null }
+                    if (item.isEmpty()) {
+                        VoiceIntentResult.Failure("Tell me what to add, e.g. 'Add milk'", text)
+                    } else {
+                        VoiceIntentResult.Success(VoiceIntent.AddItem(list, item), text)
+                    }
                 }
                 lower.startsWith("remove ") && lower.contains(" from ") -> {
                     val after = lower.removePrefix("remove ")

@@ -4,57 +4,184 @@ package com.shoppilist.shared.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.shoppilist.shared.auth.AuthService
+import com.shoppilist.shared.auth.AuthUser
+import com.shoppilist.shared.backend.ProfileBackend
+import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.data.local.ShoppingItemEntity
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
+import com.shoppilist.shared.data.session.StoredLocation
 import com.shoppilist.shared.domain.*
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
+data class AuthUiState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val info: String? = null,
+    /** An SMS code was sent; show the OTP entry field. */
+    val otpSent: Boolean = false,
+    /** Account exists but the email link hasn't been clicked yet; show the verify panel. */
+    val awaitingEmailVerification: Boolean = false,
+    val registeredEmail: String? = null,
+    /** First-time account (no first name on record yet) — route to profile setup, not Home. */
+    val needsProfile: Boolean = false,
+    /** Set only once the account is verified (issue 9's gate) — the UI navigates on this. */
+    val verifiedUser: AuthUser? = null
+)
+
 class AuthViewModel(
-    private val userDao: UserDao,
-    private val sessionManager: SessionManager
+    private val authService: AuthService,
+    private val accountSync: UserAccountSync
 ) : ViewModel() {
 
-    fun loginOrRegister(fullName: String?, email: String?, phone: String?, onDone: () -> Unit) {
-        viewModelScope.launch {
-            val existing = if (!email.isNullOrBlank() || !phone.isNullOrBlank()) {
-                userDao.findByContact(email?.takeIf { it.isNotBlank() }, phone?.takeIf { it.isNotBlank() })
-            } else null
+    private val _state = MutableStateFlow(AuthUiState())
+    val state: StateFlow<AuthUiState> = _state
 
-            val pendingLocale = sessionManager.consumePendingLocale()
-            val base = existing ?: UserEntity(
-                userId = Uuid.random().toString(),
-                fullName = fullName?.takeIf { it.isNotBlank() } ?: email ?: phone ?: "You",
-                phone = phone?.takeIf { it.isNotBlank() },
-                email = email?.takeIf { it.isNotBlank() },
-                country = null,
-                state = null,
-                city = null,
-                pincode = null,
-                profileImageUrl = null
+    /** Name captured at registration time; phone verification completes via async callbacks
+     *  that no longer have the form fields in scope. */
+    private var pendingFullName: String? = null
+
+    fun registerWithEmail(fullName: String?, email: String, password: String) {
+        val trimmed = email.trim()
+        if (!trimmed.contains("@")) { fail("Enter a valid email address"); return }
+        if (password.length < 6) { fail("Password must be at least 6 characters"); return }
+        pendingFullName = fullName
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            authService.registerWithEmail(trimmed, password)
+                .onSuccess { user ->
+                    accountSync.ensureLocalUser(user, fullName)
+                    // Send explicitly so a rejected send (quota, throttling…) surfaces here
+                    // instead of the UI claiming the email went out when it didn't.
+                    val sent = authService.sendEmailVerification()
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            awaitingEmailVerification = true,
+                            registeredEmail = trimmed,
+                            info = if (sent.isSuccess) "Verification email sent to $trimmed" else null,
+                            error = sent.exceptionOrNull()?.let { e ->
+                                "Account created, but the verification email couldn't be sent: " +
+                                    "${e.message ?: "unknown error"}. Tap Resend to try again."
+                            }
+                        )
+                    }
+                }
+                .onFailure { e -> fail(e.message ?: "Registration failed") }
+        }
+    }
+
+    fun signInWithEmail(email: String, password: String) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank() || password.isBlank()) { fail("Enter your email and password"); return }
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            authService.signInWithEmail(trimmed, password)
+                .onSuccess { user ->
+                    val local = accountSync.ensureLocalUser(user, null)
+                    if (user.isVerified) {
+                        complete(user, local)
+                    } else {
+                        _state.update {
+                            it.copy(
+                                loading = false,
+                                awaitingEmailVerification = true,
+                                registeredEmail = trimmed,
+                                info = "Your email isn't verified yet — tap the link we sent you"
+                            )
+                        }
+                    }
+                }
+                .onFailure { e -> fail(e.message ?: "Login failed") }
+        }
+    }
+
+    /** "I've clicked the link" — re-reads the account from the server. */
+    fun refreshVerificationStatus() {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            val user = authService.currentUser(refresh = true)
+            if (user != null && user.isVerified) {
+                val local = accountSync.ensureLocalUser(user, pendingFullName)
+                complete(user, local)
+            } else {
+                fail("Not verified yet — tap the link in the email first (check spam too)")
+            }
+        }
+    }
+
+    fun resendVerificationEmail() {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            authService.sendEmailVerification()
+                .onSuccess { _state.update { it.copy(loading = false, info = "Verification email sent again") } }
+                .onFailure { e -> fail(e.message ?: "Couldn't send the email") }
+        }
+    }
+
+    fun sendOtp(fullName: String?, phoneNumber: String, uiHost: Any?) {
+        val phone = phoneNumber.trim().replace(" ", "")
+        if (!phone.startsWith("+") || phone.length < 8) {
+            fail("Enter the full number with country code, e.g. +919876543210")
+            return
+        }
+        pendingFullName = fullName
+        _state.update { it.copy(loading = true, error = null, info = null) }
+        authService.startPhoneVerification(
+            phoneNumber = phone,
+            uiHost = uiHost,
+            onCodeSent = { _state.update { it.copy(loading = false, otpSent = true, info = "Code sent to $phone") } },
+            onVerified = ::onPhoneVerified,
+            onError = ::fail
+        )
+    }
+
+    fun submitOtp(code: String) {
+        if (code.isBlank()) { fail("Enter the code from the SMS"); return }
+        _state.update { it.copy(loading = true, error = null, info = null) }
+        authService.submitOtp(code.trim(), onVerified = ::onPhoneVerified, onError = ::fail)
+    }
+
+    private fun onPhoneVerified(user: AuthUser) {
+        viewModelScope.launch {
+            val local = accountSync.ensureLocalUser(user, pendingFullName)
+            complete(user, local)
+        }
+    }
+
+    private fun fail(message: String) {
+        _state.update { it.copy(loading = false, error = message) }
+    }
+
+    private fun complete(user: AuthUser, localUser: UserEntity) {
+        _state.update {
+            it.copy(
+                loading = false,
+                error = null,
+                needsProfile = localUser.firstName.isNullOrBlank(),
+                verifiedUser = user
             )
-            val user = if (pendingLocale != null) {
-                base.copy(countryCode = pendingLocale.first, languageCode = pendingLocale.second)
-            } else base
-            userDao.upsert(user)
-            sessionManager.setCurrentUser(user.userId)
-            onDone()
         }
     }
 }
 
 class HomeViewModel(
     private val getAllListsUseCase: GetAllListsUseCase,
-    private val createListUseCase: CreateListUseCase,
     private val archiveListUseCase: ArchiveListUseCase,
     private val togglePinUseCase: TogglePinUseCase,
+    private val deleteListUseCase: DeleteListUseCase,
     private val getListItemsUseCase: GetListItemsUseCase,
     private val getListMembersUseCase: GetListMembersUseCase,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val userDao: UserDao,
+    private val profileBackend: ProfileBackend,
+    private val resolveCatalogRegion: ResolveCatalogRegionUseCase,
+    private val syncCatalog: SyncCatalogUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
@@ -62,7 +189,15 @@ class HomeViewModel(
     private val _listMeta = MutableStateFlow<Map<String, ListMeta>>(emptyMap())
     val listMeta: StateFlow<Map<String, ListMeta>> = _listMeta
 
+    /** Last fetched device location (dashboard chip) — restored from storage on relogin. */
+    private val _lastLocation = MutableStateFlow(sessionManager.lastLocation())
+    val lastLocation: StateFlow<StoredLocation?> = _lastLocation
+
     init {
+        // Keep the region catalog cache warm so the create-list picker opens instantly.
+        viewModelScope.launch {
+            runCatching { syncCatalog(resolveCatalogRegion()) }
+        }
         viewModelScope.launch {
             getAllListsUseCase()
                 .catch { e -> _uiState.value = _uiState.value.copy(error = e.message) }
@@ -89,15 +224,25 @@ class HomeViewModel(
         }
     }
 
-    fun createList(name: String, description: String?, colorHex: String? = null) {
+    /** Saves a freshly fetched location everywhere it's remembered: the session store (chip on
+     *  relogin), the local profile row, and the cloud profile mirror — then refreshes the
+     *  catalog for the (possibly changed) region. */
+    fun saveLocation(location: StoredLocation) {
+        sessionManager.setLastLocation(location)
+        _lastLocation.value = location
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(loading = true)
-            val result = createListUseCase(name, description, ownerId = sessionManager.requireUserId(), colorHex = colorHex)
-            if (result.isSuccess) {
-                _uiState.value = _uiState.value.copy(loading = false)
-            } else {
-                _uiState.value = _uiState.value.copy(loading = false, error = result.exceptionOrNull()?.message)
+            val userId = sessionManager.requireUserId()
+            userDao.getUserOnce(userId)?.let { user ->
+                userDao.upsert(
+                    user.copy(
+                        city = location.city ?: user.city,
+                        state = location.state ?: user.state,
+                        countryCode = location.countryCode ?: user.countryCode
+                    )
+                )
             }
+            profileBackend.saveProfile(RemoteProfile(uid = userId, lastLocation = location))
+            runCatching { syncCatalog(resolveCatalogRegion()) }
         }
     }
 
@@ -107,6 +252,10 @@ class HomeViewModel(
 
     fun togglePin(listId: String, pinned: Boolean) {
         viewModelScope.launch { togglePinUseCase(listId, pinned) }
+    }
+
+    fun deleteList(listId: String) {
+        viewModelScope.launch { deleteListUseCase(listId) }
     }
 }
 

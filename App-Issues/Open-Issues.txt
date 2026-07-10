@@ -1,0 +1,28 @@
+1.Country list not scrollable.
+2.Voice command not working.
+3.Delete list option is missing.
+4.Create list form UI distorted in android phone.
+5.Online store UI distorted.
+6.Register with phone number and otp is missing.
+7.Register with email should go for verification of email.
+8.Profile should show email and phone number are verified or not.
+9.Either email or phone number should be in verified to proceed further on dashboard page.
+10. Application UI should support all below resolutions:
+Standard phone 375–390 iPhone 12–15;
+most mid-range Android Large phone 412–430 iPhone Pro Max, Pixel Pro, Samsung Ultra;
+Small tablet 600–768 Small Android tablets;
+iPad MiniLarge tablet 810–1024 iPad, iPad Pro;
+Foldables (unfolded)673–840 Galaxy Fold, Pixel Fold;
+
+11. Things beyond just resolution to take care:
+Aspect ratios: not just width/height but ratios like 16:9, 18:9, 19.5:9, 20:9 — notches and cutouts affect safe areas.
+Pixel density (DPI/PPI): test @1x, @2x, @3x asset scaling; use dp/pt units, never hardcode px.
+Safe areas / notches: iPhone notch/Dynamic Island, Android punch-holes, gesture nav bars.
+Orientation: portrait and landscape, especially for tablets.
+OS-level text scaling: test with large accessibility font sizes — layouts often break here before they break on screen size.
+
+12. Error on registration flow with email.
+13. Error on registration flow with phone number
+
+
+

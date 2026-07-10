@@ -1,5 +1,7 @@
 package com.shoppilist.shared.voice
 
+import com.shoppilist.shared.data.local.ShoppingItemEntity
+import com.shoppilist.shared.data.local.ShoppingListEntity
 import com.shoppilist.shared.domain.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,7 +54,13 @@ class CommandExecutor(
 
     private suspend fun handleAddItem(intent: VoiceIntent.AddItem): ExecutionResult {
         return try {
-            val listId = resolveListId(intent.listName) ?: return ExecutionResult.Failure("List not found")
+            val listId = if (intent.listName != null) {
+                resolveListId(intent.listName)
+                    ?: return ExecutionResult.Failure("Couldn't find a list named '${intent.listName}'")
+            } else {
+                listsSnapshot().firstOrNull()?.listId
+                    ?: return ExecutionResult.Failure("No lists yet — try 'Create list called Weekly Groceries' first")
+            }
             val result = addItemUseCase(
                 listId = listId,
                 itemName = intent.itemName,
@@ -73,13 +81,11 @@ class CommandExecutor(
 
     private suspend fun handleDeleteItem(intent: VoiceIntent.DeleteItem): ExecutionResult {
         return try {
-            val listId = intent.listName?.let { resolveListId(it) } ?: return ExecutionResult.Failure("List ambiguous")
-            val items = getListItemsUseCase(listId)
-            // For testing: just delete first item by name match
-            val itemId = intent.itemName // simplified; in production, match by name
-            val result = deleteItemUseCase(itemId)
+            val item = findItemByName(intent.listName, intent.itemName)
+                ?: return ExecutionResult.Failure(itemNotFoundMessage(intent.itemName, intent.listName))
+            val result = deleteItemUseCase(item.itemId)
             if (result.isSuccess) {
-                ExecutionResult.Success("Removed '${intent.itemName}' from list")
+                ExecutionResult.Success("Removed '${item.name}' from list")
             } else {
                 ExecutionResult.Failure(result.exceptionOrNull()?.message ?: "Failed to delete item")
             }
@@ -90,18 +96,40 @@ class CommandExecutor(
 
     private suspend fun handleMarkPurchased(intent: VoiceIntent.MarkPurchased): ExecutionResult {
         return try {
-            val listId = intent.listName?.let { resolveListId(it) } ?: return ExecutionResult.Failure("List ambiguous")
-            // Simplified: match by name; in production, search items in listId and mark first match
-            val itemId = intent.itemName // simplified
-            val result = markItemCheckedUseCase(itemId, checked = true)
+            val item = findItemByName(intent.listName, intent.itemName)
+                ?: return ExecutionResult.Failure(itemNotFoundMessage(intent.itemName, intent.listName))
+            val result = markItemCheckedUseCase(item.itemId, checked = true)
             if (result.isSuccess) {
-                ExecutionResult.Success("Marked '${intent.itemName}' as purchased")
+                ExecutionResult.Success("Marked '${item.name}' as purchased")
             } else {
                 ExecutionResult.Failure(result.exceptionOrNull()?.message ?: "Failed to mark item")
             }
         } catch (e: Exception) {
             ExecutionResult.Failure(e.message ?: "Mark item error")
         }
+    }
+
+    private fun itemNotFoundMessage(itemName: String, listName: String?): String =
+        if (listName != null) "Couldn't find '$itemName' in '$listName'" else "Couldn't find '$itemName' in your lists"
+
+    private suspend fun listsSnapshot(): List<ShoppingListEntity> =
+        try { getAllListsUseCase().first() } catch (e: Exception) { emptyList() }
+
+    /** Finds an item by spoken name — in the named list if given, otherwise across all lists. */
+    private suspend fun findItemByName(listName: String?, itemName: String): ShoppingItemEntity? {
+        val listIds = if (listName != null) {
+            listOfNotNull(resolveListId(listName))
+        } else {
+            listsSnapshot().map { it.listId }
+        }
+        val lower = itemName.lowercase()
+        for (listId in listIds) {
+            val items = try { getListItemsUseCase(listId).first() } catch (e: Exception) { emptyList() }
+            val match = items.firstOrNull { it.name.lowercase() == lower }
+                ?: items.firstOrNull { it.name.lowercase().contains(lower) }
+            if (match != null) return match
+        }
+        return null
     }
 
     private suspend fun resolveListId(listName: String?): String? {

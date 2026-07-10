@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// ShoppiList Firestore rules. Paste into Firebase console -> Firestore Database -> Rules
+// (or deploy with `firebase deploy --only firestore:rules`).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Master item catalog: everyone signed-in reads; only admins write (the seed script uses
+    // the Admin SDK, which bypasses rules).
+    match /catalog/{region}/items/{itemId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Off-catalog items reported by users. Any signed-in user may create/update a report
+    // (repeat adds merge into one doc); only admins may read the review queue or delete.
+    match /custom_items/{reportId} {
+      allow create, update: if signedIn();
+      allow read, delete: if isAdmin();
+    }
+
+    // Profile mirror: owners manage their own doc; admins may read (location/address info).
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    // Admin markers: a user may check their own admin status; nobody writes from the client
+    // (manage via Firebase console or the seed script).
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+  }
+}

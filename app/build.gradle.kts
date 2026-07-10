@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -104,6 +105,16 @@ dependencies {
 
     // Coil (for images)
     implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // Firebase Authentication (issues 6-9: phone OTP + email verification).
+    // Android-only: :shared talks to it through the AuthService interface.
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    implementation("com.google.firebase:firebase-auth")
+    // Cloud backend: per-region master catalog, custom-item reports for admin review, profile
+    // mirror. Android-only: :shared talks to it through the backend/CloudBackend interfaces.
+    implementation("com.google.firebase:firebase-firestore")
+    // .await() on Firebase Tasks
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

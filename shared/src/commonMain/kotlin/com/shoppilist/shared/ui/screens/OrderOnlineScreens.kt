@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.data.local.SponsoredRetailerEntity
@@ -27,16 +28,24 @@ private fun RetailerTile(
     onClick: () -> Unit
 ) {
     OutlinedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        // Column, not a side-by-side Row: tiles are ~half the screen wide, and a long
+        // retailer name next to the chip squeezes the chip label into vertical text.
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("${retailer.logoEmoji} ${retailer.name}", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
-                if (retailer.isSponsored) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("Sponsored", style = MaterialTheme.typography.labelSmall) },
-                        colors = AssistChipDefaults.assistChipColors(containerColor = SponsoredAmber.copy(alpha = 0.15f), labelColor = SponsoredAmber)
-                    )
-                }
+            Text(
+                "${retailer.logoEmoji} ${retailer.name}",
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (retailer.isSponsored) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Sponsored",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SponsoredAmber
+                )
             }
         }
     }
@@ -81,7 +90,14 @@ fun ItemOrderOnlineScreen(
             if (retailers.isEmpty()) {
                 Text("No retailers available for your country yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                LazyVerticalGrid(columns = GridCells.Fixed(2), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyVerticalGrid(
+                    // Adaptive instead of Fixed(2): scales from small phones to tablets/foldables.
+                    columns = GridCells.Adaptive(minSize = 150.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // Weighted so the "Order Whole List" button below always stays on screen.
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
                     items(retailers) { retailer ->
                         RetailerTile(retailer) {
                             val name = item?.name ?: ""
@@ -133,7 +149,12 @@ fun OrderWholeListScreen(
         ) {
             Text("Choose a retailer", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            LazyVerticalGrid(columns = GridCells.Fixed(2), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 150.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
                 items(retailers) { retailer ->
                     RetailerTile(retailer) {
                         pickedRetailer = retailer

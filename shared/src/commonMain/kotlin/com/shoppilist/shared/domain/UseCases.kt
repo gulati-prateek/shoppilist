@@ -2,8 +2,10 @@
 
 package com.shoppilist.shared.domain
 
+import com.shoppilist.shared.backend.CatalogBackend
 import com.shoppilist.shared.data.local.ShoppingListEntity
 import com.shoppilist.shared.data.local.ShoppingItemEntity
+import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.repository.ShoppingListRepository
 import com.shoppilist.shared.data.repository.ShoppingItemRepository
 import com.shoppilist.shared.data.repository.SuggestionRepository
@@ -61,7 +63,9 @@ data class AddItemResult(val itemId: String, val ambiguousCategoryId: String? = 
 class AddItemUseCase(
     private val repo: ShoppingItemRepository,
     private val categoryMatcher: CategoryMatcher,
-    private val suggestionRepo: SuggestionRepository
+    private val suggestionRepo: SuggestionRepository,
+    private val catalogBackend: CatalogBackend,
+    private val userDao: UserDao
 ) {
     suspend operator fun invoke(
         listId: String,
@@ -90,6 +94,17 @@ class AddItemUseCase(
         val result = repo.addItem(item)
         if (result.isSuccess && addedBy != null) {
             suggestionRepo.recordItemAdded(addedBy, itemName, listId)
+            // Every add path (create-list picker, list-detail field, voice) funnels through
+            // here, so this one hook reports all off-catalog items for admin review.
+            if (match is CategoryMatch.NoMatch) {
+                val user = userDao.getUserOnce(addedBy)
+                catalogBackend.reportCustomItem(
+                    name = itemName,
+                    userId = addedBy,
+                    userName = user?.fullName,
+                    countryCode = user?.countryCode
+                )
+            }
         }
         return result.map { AddItemResult(it, ambiguousCategoryId) }
     }
