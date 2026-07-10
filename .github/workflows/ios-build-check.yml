@@ -89,10 +89,21 @@ jobs:
             echo "App is still running (PID $APP_PID) 5s after launch -- smoke test passed."
           else
             echo "App (PID $APP_PID) is NOT running 5s after launch -- it crashed or exited."
+
+            # Kotlin/Native prints uncaught-exception stack traces to STDERR, which the unified
+            # os_log (`log show`) does NOT capture. Relaunch attached to a console pty so that
+            # stderr (and thus the real crash reason) is captured.
+            echo "--- Relaunching with console capture (stdout/stderr) ---"
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+            timeout 25 xcrun simctl launch --console-pty "$UDID" "$BUNDLE_ID" 2>&1 | tee app-console.log || true
+
             echo "--- Recent unified log for the app process ---"
-            xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "iosApp"' 2>/dev/null || true
-            echo "--- Crash reports from the last 5 minutes ---"
-            find ~/Library/Logs/DiagnosticReports -mmin -5 -print -exec cat {} \; 2>/dev/null || echo "(none found)"
+            xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "iosApp"' 2>/dev/null | tail -60 || true
+
+            echo "--- Crash reports (host DiagnosticReports) ---"
+            find ~/Library/Logs/DiagnosticReports -mmin -5 -print -exec cat {} \; 2>/dev/null || echo "(none)"
+            echo "--- Crash reports (simulator device logs) ---"
+            find "$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs" -mmin -5 -type f -print -exec cat {} \; 2>/dev/null || echo "(none)"
             exit 1
           fi
 
