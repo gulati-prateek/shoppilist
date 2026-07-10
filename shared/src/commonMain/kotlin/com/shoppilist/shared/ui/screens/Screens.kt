@@ -154,6 +154,27 @@ private fun AuthMethodTabs(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
+/** Phase 3: "Continue with Google" — hidden when Google sign-in isn't configured on this platform. */
+@Composable
+private fun GoogleSignInButton(onIdToken: (String) -> Unit, enabled: Boolean) {
+    var error by remember { mutableStateOf<String?>(null) }
+    val controller = com.shoppilist.shared.auth.rememberGoogleSignIn(
+        onIdToken = onIdToken,
+        onError = { error = it }
+    )
+    if (!controller.isAvailable) return
+    OutlinedButton(
+        onClick = { error = null; controller.launch() },
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("Continue with Google")
+    }
+    error?.let {
+        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
 @Composable
 private fun ForgotPasswordDialog(initialEmail: String, onSend: (String) -> Unit, onDismiss: () -> Unit) {
     var email by remember { mutableStateOf(initialEmail) }
@@ -245,6 +266,11 @@ fun LoginScreen(
         if (state.awaitingEmailVerification) {
             EmailVerificationPanel(state, viewModel)
         } else {
+            GoogleSignInButton(
+                onIdToken = { viewModel.signInWithGoogle(it) },
+                enabled = !state.loading
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             AuthMethodTabs(selected = method, onSelect = { method = it })
             Spacer(modifier = Modifier.height(16.dp))
             if (method == 0) {
@@ -334,6 +360,11 @@ fun RegisterScreen(
         if (state.awaitingEmailVerification) {
             EmailVerificationPanel(state, viewModel)
         } else {
+            GoogleSignInButton(
+                onIdToken = { viewModel.signInWithGoogle(it) },
+                enabled = !state.loading
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             AuthMethodTabs(selected = method, onSelect = { method = it })
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(

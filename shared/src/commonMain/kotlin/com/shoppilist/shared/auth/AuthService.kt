@@ -39,6 +39,9 @@ interface AuthService {
     /** Sends a password-reset email to [email] (item 5). No-op success is not assumed — errors surface. */
     suspend fun sendPasswordReset(email: String): Result<Unit>
 
+    /** Exchanges a Google ID token (obtained by the platform sign-in UI) for a Firebase session. */
+    suspend fun signInWithGoogle(idToken: String): Result<AuthUser>
+
     /**
      * Starts phone-number verification. [uiHost] is the platform UI handle the backend needs
      * (the current Activity on Android, for the reCAPTCHA/Play-Integrity fallback) — obtain it

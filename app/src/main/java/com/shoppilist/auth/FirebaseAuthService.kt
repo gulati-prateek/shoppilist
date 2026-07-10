@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
@@ -74,6 +75,16 @@ class FirebaseAuthService : AuthService {
         try {
             auth.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(friendly(e))
+        }
+
+    override suspend fun signInWithGoogle(idToken: String): Result<AuthUser> =
+        try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            val user = auth.signInWithCredential(credential).await().user
+                ?: throw IllegalStateException("Google sign-in returned no user")
+            Result.success(user.toAuthUser())
         } catch (e: Exception) {
             Result.failure(friendly(e))
         }

@@ -21,6 +21,9 @@ class StubAuthService : AuthService {
     override suspend fun sendPasswordReset(email: String): Result<Unit> =
         Result.failure(IllegalStateException(notAvailable))
 
+    override suspend fun signInWithGoogle(idToken: String): Result<AuthUser> =
+        Result.failure(IllegalStateException(notAvailable))
+
     override fun startPhoneVerification(
         phoneNumber: String,
         uiHost: Any?,

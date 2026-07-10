@@ -126,6 +126,19 @@ class AuthViewModel(
         }
     }
 
+    /** Phase 3: complete Google sign-in once the platform UI returns an ID token. */
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            authService.signInWithGoogle(idToken)
+                .onSuccess { user ->
+                    val localUser = accountSync.ensureLocalUser(user, null)
+                    complete(user, localUser)
+                }
+                .onFailure { e -> fail(e.message ?: "Google sign-in failed") }
+        }
+    }
+
     /** Item 5: email password-reset link. */
     fun sendPasswordReset(email: String) {
         val trimmed = email.trim()
