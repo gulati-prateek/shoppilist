@@ -70,6 +70,14 @@ class FirebaseAuthService : AuthService {
             Result.failure(friendly(e))
         }
 
+    override suspend fun sendPasswordReset(email: String): Result<Unit> =
+        try {
+            auth.sendPasswordResetEmail(email.trim()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(friendly(e))
+        }
+
     /** Firebase's raw messages are developer-speak; translate the recoverable ones. */
     private fun friendly(e: Exception): Exception = when (e) {
         is FirebaseTooManyRequestsException ->

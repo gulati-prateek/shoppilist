@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.shoppilist.shared.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -151,6 +153,34 @@ private fun AuthMethodTabs(selected: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
+private fun ForgotPasswordDialog(initialEmail: String, onSend: (String) -> Unit, onDismiss: () -> Unit) {
+    var email by remember { mutableStateOf(initialEmail) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reset password") },
+        text = {
+            Column {
+                Text(
+                    "We'll email you a link to set a new password.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = email, onValueChange = { email = it },
+                    label = { Text("Account email") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSend(email) }, enabled = email.contains("@")) { Text("Send link") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
 fun LoginScreen(
     viewModel: AuthViewModel = koinViewModel(),
     onCreateAccount: () -> Unit = {},
@@ -164,8 +194,17 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
+    var showForgot by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.verifiedUser) { if (state.verifiedUser != null) onLoginSuccess(state.needsProfile) }
+
+    if (showForgot) {
+        ForgotPasswordDialog(
+            initialEmail = email,
+            onSend = { viewModel.sendPasswordReset(it); showForgot = false },
+            onDismiss = { showForgot = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -176,8 +215,14 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Login", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(16.dp))
+        // Branded header — the login screen carries the ShoppiList splash branding (item 4).
+        Text("ShoppiList", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Shop anything, together",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
 
         if (state.awaitingEmailVerification) {
             EmailVerificationPanel(state, viewModel)
@@ -200,6 +245,7 @@ fun LoginScreen(
                 Button(onClick = { viewModel.signInWithEmail(email, password) }, enabled = !state.loading) {
                     Text("Login")
                 }
+                TextButton(onClick = { showForgot = true }) { Text("Forgot password?") }
             } else {
                 OutlinedTextField(
                     value = phone,
@@ -330,6 +376,152 @@ fun RegisterScreen(
     }
 }
 
+private const val CITY_OTHER = "Other — type it"
+
+/**
+ * Reusable cascading address form (Country → State → City → PIN). State options populate from the
+ * chosen country, city options from the chosen state (disabled until a state is picked), and city
+ * offers an "Other" free-text fallback for unlisted places. PIN is free text validated per country.
+ * Parent owns the values; picking a country resets state+city, picking a state resets city.
+ */
+@Composable
+fun AddressForm(
+    country: String?,
+    stateRegion: String,
+    city: String,
+    pincode: String,
+    addressLine: String,
+    onCountryChange: (String) -> Unit,
+    onStateChange: (String) -> Unit,
+    onCityChange: (String) -> Unit,
+    onPincodeChange: (String) -> Unit,
+    onAddressLineChange: (String) -> Unit,
+    pincodeError: Boolean = false
+) {
+    var showCountryPicker by remember { mutableStateOf(false) }
+    var stateExpanded by remember { mutableStateOf(false) }
+    var cityExpanded by remember { mutableStateOf(false) }
+    val states = remember(country) { com.shoppilist.shared.domain.LocationData.statesFor(country) }
+    val cities = remember(country, stateRegion) {
+        com.shoppilist.shared.domain.LocationData.citiesFor(country, stateRegion)
+    }
+    // City is "custom" (free text) when the user picked Other or typed something not in the list.
+    var cityIsCustom by remember(country, stateRegion) {
+        mutableStateOf(city.isNotBlank() && city !in cities)
+    }
+
+    val currentCountry = com.shoppilist.shared.domain.CountryLanguageData.countries.find { it.code == country }
+    OutlinedTextField(
+        value = currentCountry?.let { "${it.flag} ${it.name}" } ?: "",
+        onValueChange = {},
+        readOnly = true,
+        label = { Text("Country") },
+        placeholder = { Text("Select country") },
+        modifier = Modifier.fillMaxWidth().clickable { showCountryPicker = true }
+    )
+    if (showCountryPicker) {
+        Dialog(onDismissRequest = { showCountryPicker = false }) {
+            Card {
+                CountryPickerList(
+                    modifier = Modifier.padding(16.dp).heightIn(max = 480.dp),
+                    onSelect = { picked ->
+                        onCountryChange(picked.code)
+                        showCountryPicker = false
+                    }
+                )
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // State dropdown — enabled once a country with known states is selected.
+    ExposedDropdownMenuBox(
+        expanded = stateExpanded && states.isNotEmpty(),
+        onExpandedChange = { if (states.isNotEmpty()) stateExpanded = it }
+    ) {
+        OutlinedTextField(
+            value = stateRegion,
+            onValueChange = {},
+            readOnly = true,
+            enabled = states.isNotEmpty(),
+            label = { Text(if (states.isEmpty()) "State (select a country first)" else "State") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = stateExpanded, onDismissRequest = { stateExpanded = false }) {
+            states.forEach { s ->
+                DropdownMenuItem(text = { Text(s) }, onClick = {
+                    onStateChange(s)
+                    cityIsCustom = false
+                    stateExpanded = false
+                })
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // City dropdown — disabled until a state is chosen; "Other" reveals a free-text field.
+    val cityEnabled = stateRegion.isNotBlank()
+    if (cityIsCustom) {
+        OutlinedTextField(
+            value = city,
+            onValueChange = onCityChange,
+            label = { Text("City") },
+            singleLine = true,
+            trailingIcon = {
+                TextButton(onClick = { cityIsCustom = false; onCityChange("") }) { Text("List") }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+    } else {
+        ExposedDropdownMenuBox(
+            expanded = cityExpanded && cityEnabled,
+            onExpandedChange = { if (cityEnabled) cityExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = city,
+                onValueChange = {},
+                readOnly = true,
+                enabled = cityEnabled,
+                label = { Text(if (!cityEnabled) "City (select a state first)" else "City") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(expanded = cityExpanded, onDismissRequest = { cityExpanded = false }) {
+                cities.forEach { c ->
+                    DropdownMenuItem(text = { Text(c) }, onClick = { onCityChange(c); cityExpanded = false })
+                }
+                DropdownMenuItem(
+                    text = { Text(CITY_OTHER) },
+                    onClick = { cityIsCustom = true; onCityChange(""); cityExpanded = false }
+                )
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = pincode,
+        onValueChange = onPincodeChange,
+        label = { Text("Postal / PIN / ZIP code") },
+        singleLine = true,
+        isError = pincodeError,
+        supportingText = if (pincodeError) {
+            { Text("Enter a valid code for the selected country") }
+        } else null,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = addressLine,
+        onValueChange = onAddressLineChange,
+        label = { Text("Address line (optional)") },
+        minLines = 2,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
 /**
  * First-run registration form: first name required; last name, email (hidden for email
  * sign-ups — the account already has one), and address optional. "Use my current location"
@@ -350,6 +542,8 @@ fun ProfileSetupScreen(
     var city by remember(state.loading) { mutableStateOf(state.initialCity) }
     var stateRegion by remember(state.loading) { mutableStateOf(state.initialState) }
     var pincode by remember(state.loading) { mutableStateOf(state.initialPincode) }
+    var country by remember(state.loading) { mutableStateOf(state.initialCountry) }
+    var pincodeError by remember { mutableStateOf(false) }
     var location by remember { mutableStateOf<StoredLocation?>(null) }
     var locationError by remember { mutableStateOf<String?>(null) }
     var fetchingLocation by remember { mutableStateOf(false) }
@@ -359,10 +553,11 @@ fun ProfileSetupScreen(
             fetchingLocation = false
             locationError = null
             location = fetched
-            // GPS reverse-geocode fills the granular fields (screenshot c).
+            // GPS reverse-geocode fills the granular fields.
             fetched.addressLine?.let { address = it }
-            fetched.city?.let { if (city.isBlank()) city = it }
+            fetched.countryCode?.let { country = it }
             fetched.state?.let { if (stateRegion.isBlank()) stateRegion = it }
+            fetched.city?.let { if (city.isBlank()) city = it }
         },
         onError = { message ->
             fetchingLocation = false
@@ -410,32 +605,18 @@ fun ProfileSetupScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
-        OutlinedTextField(
-            value = address, onValueChange = { address = it },
-            label = { Text("Address line (optional)") },
-            minLines = 2,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                value = city, onValueChange = { city = it },
-                label = { Text("City") }, singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedTextField(
-                value = stateRegion, onValueChange = { stateRegion = it },
-                label = { Text("State") }, singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = pincode, onValueChange = { pincode = it },
-            label = { Text("Postal / PIN code") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth()
+        AddressForm(
+            country = country,
+            stateRegion = stateRegion,
+            city = city,
+            pincode = pincode,
+            addressLine = address,
+            onCountryChange = { country = it; stateRegion = ""; city = "" },
+            onStateChange = { stateRegion = it; city = "" },
+            onCityChange = { city = it },
+            onPincodeChange = { pincode = it; pincodeError = false },
+            onAddressLineChange = { address = it },
+            pincodeError = pincodeError
         )
         if (locationController.isAvailable) {
             TextButton(
@@ -469,7 +650,15 @@ fun ProfileSetupScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { viewModel.save(firstName, lastName, email, address, city, stateRegion, pincode, location) },
+            onClick = {
+                // PIN is optional, but if entered it must match the country's rule.
+                if (pincode.isNotBlank() &&
+                    !com.shoppilist.shared.domain.LocationData.isValidPincode(country, pincode)) {
+                    pincodeError = true
+                } else {
+                    viewModel.save(firstName, lastName, email, address, city, stateRegion, pincode, country, location)
+                }
+            },
             enabled = !state.saving && !state.loading,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -597,9 +786,19 @@ fun ProfileScreen(
     val authUser by viewModel.authUser.collectAsState()
     val isAdmin by viewModel.isAdmin.collectAsState()
     val loggedOut by viewModel.loggedOut.collectAsState()
-    var showCountryPicker by remember { mutableStateOf(false) }
+    val profileSaved by viewModel.profileSaved.collectAsState()
+
+    // Editable fields (item 3 / P2), re-seeded whenever the loaded user changes.
+    var editName by remember(user?.userId) { mutableStateOf(user?.fullName.orEmpty()) }
+    var editCountry by remember(user?.userId) { mutableStateOf(user?.countryCode) }
+    var editState by remember(user?.userId) { mutableStateOf(user?.state.orEmpty()) }
+    var editCity by remember(user?.userId) { mutableStateOf(user?.city.orEmpty()) }
+    var editPincode by remember(user?.userId) { mutableStateOf(user?.pincode.orEmpty()) }
+    var editAddress by remember(user?.userId) { mutableStateOf(user?.address.orEmpty()) }
+    var pincodeError by remember { mutableStateOf(false) }
 
     LaunchedEffect(loggedOut) { if (loggedOut) onLoggedOut() }
+    LaunchedEffect(profileSaved) { if (profileSaved) viewModel.ackProfileSaved() }
 
     Column(
         modifier = Modifier
@@ -647,18 +846,6 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    user?.let { profile ->
-                        val fullAddress = listOfNotNull(
-                            profile.address?.takeIf { it.isNotBlank() },
-                            profile.city?.takeIf { it.isNotBlank() },
-                            profile.state?.takeIf { it.isNotBlank() },
-                            profile.pincode?.takeIf { it.isNotBlank() }
-                        ).joinToString(", ")
-                        if (fullAddress.isNotBlank()) {
-                            ProfileInfoRow(label = "Address", value = fullAddress)
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
                     AccountContactRow(label = "Email", value = account.email, verified = account.emailVerified)
                     Spacer(modifier = Modifier.height(8.dp))
                     AccountContactRow(
@@ -686,55 +873,44 @@ fun ProfileScreen(
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+        Text("Your details", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        OutlinedTextField(
+            value = editName, onValueChange = { editName = it },
+            label = { Text("Name") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        AddressForm(
+            country = editCountry,
+            stateRegion = editState,
+            city = editCity,
+            pincode = editPincode,
+            addressLine = editAddress,
+            onCountryChange = { editCountry = it; editState = ""; editCity = "" },
+            onStateChange = { editState = it; editCity = "" },
+            onCityChange = { editCity = it },
+            onPincodeChange = { editPincode = it; pincodeError = false },
+            onAddressLineChange = { editAddress = it },
+            pincodeError = pincodeError
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(
+            onClick = {
+                if (editPincode.isNotBlank() &&
+                    !com.shoppilist.shared.domain.LocationData.isValidPincode(editCountry, editPincode)) {
+                    pincodeError = true
+                } else {
+                    viewModel.saveProfile(editName, editCountry, editState, editCity, editPincode, editAddress)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Hide sponsored links", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Show only organic retailer recommendations in Order Online",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = user?.hideSponsoredLinks ?: false,
-                onCheckedChange = { viewModel.setHideSponsoredLinks(it) }
-            )
+            Text(if (profileSaved) "Saved ✓" else "Save changes")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text("Country & Language", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val currentCountry = com.shoppilist.shared.domain.CountryLanguageData.countries
-            .find { it.code == user?.countryCode }
-        OutlinedTextField(
-            value = currentCountry?.let { "${it.flag} ${it.name}" } ?: "Not set",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Country") },
-            modifier = Modifier.fillMaxWidth().clickable { showCountryPicker = true }
-        )
-        if (showCountryPicker) {
-            Dialog(onDismissRequest = { showCountryPicker = false }) {
-                Card {
-                    CountryPickerList(
-                        modifier = Modifier.padding(16.dp).heightIn(max = 480.dp),
-                        onSelect = { country ->
-                            val defaultLanguage = com.shoppilist.shared.domain.CountryLanguageData.languagesFor(country.code).firstOrNull()?.code ?: "en"
-                            viewModel.setLocale(country.code, defaultLanguage)
-                            showCountryPicker = false
-                        }
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
         OutlinedButton(
             onClick = { viewModel.logout() },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),

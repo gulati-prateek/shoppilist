@@ -21,7 +21,7 @@ val viewModelModule = module {
     viewModel { InviteViewModel(get(), get(), get(), get(), get()) }
     viewModel { OnboardingViewModel(get()) }
     viewModel { OrderOnlineViewModel(get(), get(), get(), get(), get(), get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { AdminViewModel(get(), get()) }
     viewModel { VoiceViewModel(get(), get()) }
     viewModel { ActivityViewModel(get()) }

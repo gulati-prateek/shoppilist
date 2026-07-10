@@ -41,8 +41,10 @@ class SplashViewModel(
                 val local = accountSync.ensureLocalUser(user)
                 if (local.firstName.isNullOrBlank()) StartDestination.PROFILE_SETUP else StartDestination.HOME
             }
-            sessionManager.onboardingDone -> StartDestination.LOGIN
-            else -> StartDestination.ONBOARDING
+            // Streamlined flow: the branded Login screen is the entry point for anyone not signed
+            // in — the separate Welcome/Country/Language onboarding was removed (country is now
+            // captured in the profile-setup form).
+            else -> StartDestination.LOGIN
         }
     }
 }
@@ -60,7 +62,8 @@ data class ProfileSetupUiState(
     val initialAddress: String = "",
     val initialCity: String = "",
     val initialState: String = "",
-    val initialPincode: String = ""
+    val initialPincode: String = "",
+    val initialCountry: String? = null
 )
 
 /**
@@ -96,7 +99,8 @@ class ProfileViewModel(
                     initialAddress = user?.address.orEmpty(),
                     initialCity = user?.city.orEmpty(),
                     initialState = user?.state.orEmpty(),
-                    initialPincode = user?.pincode.orEmpty()
+                    initialPincode = user?.pincode.orEmpty(),
+                    initialCountry = user?.countryCode
                 )
             }
         }
@@ -110,6 +114,7 @@ class ProfileViewModel(
         city: String = "",
         state: String = "",
         pincode: String = "",
+        country: String? = null,
         location: StoredLocation? = null
     ) {
         val first = firstName.trim()
@@ -150,7 +155,7 @@ class ProfileViewModel(
                     city = city.trim().ifBlank { location?.city ?: base.city },
                     state = state.trim().ifBlank { location?.state ?: base.state },
                     pincode = pincode.trim().ifBlank { base.pincode },
-                    countryCode = location?.countryCode ?: base.countryCode
+                    countryCode = country ?: location?.countryCode ?: base.countryCode
                 )
             }
             userDao.upsert(updated)

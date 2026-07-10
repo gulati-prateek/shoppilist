@@ -126,6 +126,18 @@ class AuthViewModel(
         }
     }
 
+    /** Item 5: email password-reset link. */
+    fun sendPasswordReset(email: String) {
+        val trimmed = email.trim()
+        if (!trimmed.contains("@")) { fail("Enter your account email first"); return }
+        viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null, info = null) }
+            authService.sendPasswordReset(trimmed)
+                .onSuccess { _state.update { it.copy(loading = false, info = "Reset link sent — check your email") } }
+                .onFailure { e -> fail(e.message ?: "Couldn't send the reset link") }
+        }
+    }
+
     fun sendOtp(fullName: String?, phoneNumber: String, uiHost: Any?) {
         val phone = phoneNumber.trim().replace(" ", "")
         if (!phone.startsWith("+") || phone.length < 8) {

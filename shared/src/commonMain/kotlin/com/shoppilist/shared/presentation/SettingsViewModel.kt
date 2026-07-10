@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.auth.AuthUser
 import com.shoppilist.shared.backend.AdminBackend
+import com.shoppilist.shared.backend.ProfileBackend
+import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
@@ -16,7 +18,8 @@ class SettingsViewModel(
     private val userDao: UserDao,
     private val sessionManager: SessionManager,
     private val authService: AuthService,
-    private val adminBackend: AdminBackend
+    private val adminBackend: AdminBackend,
+    private val profileBackend: ProfileBackend
 ) : ViewModel() {
 
     private val _user = MutableStateFlow<UserEntity?>(null)
@@ -44,6 +47,53 @@ class SettingsViewModel(
 
     fun setLocale(countryCode: String, languageCode: String) =
         updateUser { it.copy(countryCode = countryCode, languageCode = languageCode) }
+
+    private val _profileSaved = MutableStateFlow(false)
+    val profileSaved: StateFlow<Boolean> = _profileSaved
+
+    /** Item 3 / P2: save edited name + address + country from the Profile screen. */
+    fun saveProfile(
+        fullName: String,
+        country: String?,
+        state: String,
+        city: String,
+        pincode: String,
+        address: String
+    ) {
+        val current = _user.value ?: return
+        viewModelScope.launch {
+            val parts = fullName.trim().split(" ", limit = 2)
+            val updated = current.copy(
+                fullName = fullName.trim().ifBlank { current.fullName },
+                firstName = parts.getOrNull(0)?.ifBlank { null } ?: current.firstName,
+                lastName = parts.getOrNull(1)?.trim()?.ifBlank { null },
+                countryCode = country ?: current.countryCode,
+                state = state.trim().ifBlank { current.state },
+                city = city.trim().ifBlank { current.city },
+                pincode = pincode.trim().ifBlank { current.pincode },
+                address = address.trim().ifBlank { current.address }
+            )
+            userDao.upsert(updated)
+            profileBackend.saveProfile(
+                RemoteProfile(
+                    uid = updated.userId,
+                    firstName = updated.firstName,
+                    lastName = updated.lastName,
+                    email = updated.email,
+                    phone = updated.phone,
+                    address = updated.address,
+                    city = updated.city,
+                    state = updated.state,
+                    countryCode = updated.countryCode,
+                    pincode = updated.pincode,
+                    languageCode = updated.languageCode
+                )
+            )
+            _profileSaved.value = true
+        }
+    }
+
+    fun ackProfileSaved() { _profileSaved.value = false }
 
     /** Item 6: sign out. Clears the Firebase session and the local current-user pointer, then the
      *  screen navigates back to Login. The local data + remembered location survive (see

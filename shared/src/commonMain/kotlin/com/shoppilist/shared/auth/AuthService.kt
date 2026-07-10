@@ -36,6 +36,9 @@ interface AuthService {
 
     suspend fun sendEmailVerification(): Result<Unit>
 
+    /** Sends a password-reset email to [email] (item 5). No-op success is not assumed — errors surface. */
+    suspend fun sendPasswordReset(email: String): Result<Unit>
+
     /**
      * Starts phone-number verification. [uiHost] is the platform UI handle the backend needs
      * (the current Activity on Android, for the reCAPTCHA/Play-Integrity fallback) — obtain it

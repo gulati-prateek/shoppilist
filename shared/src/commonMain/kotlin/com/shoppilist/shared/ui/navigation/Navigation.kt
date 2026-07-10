@@ -68,26 +68,10 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 val route = when (destination) {
                     StartDestination.HOME -> Screen.Home.route
                     StartDestination.PROFILE_SETUP -> Screen.ProfileSetup.route
-                    StartDestination.LOGIN -> Screen.Login.route
-                    StartDestination.ONBOARDING -> Screen.Onboarding.route
+                    // Streamlined: the branded Login screen is the sole not-signed-in entry point.
+                    StartDestination.LOGIN, StartDestination.ONBOARDING -> Screen.Login.route
                 }
                 navController.navigate(route) { popUpTo(0) }
-            }
-        }
-        composable(Screen.Onboarding.route) {
-            OnboardingScreen { navController.navigate(Screen.CountrySelection.route) }
-        }
-        composable(Screen.CountrySelection.route) {
-            CountrySelectionScreen { country ->
-                navController.navigate(Screen.LanguageSelection.createRoute(country.code))
-            }
-        }
-        composable(Screen.LanguageSelection.route) { backStackEntry ->
-            val countryCode = backStackEntry.arguments?.read { getStringOrNull("countryCode") } ?: "US"
-            val country = CountryLanguageData.countries.find { it.code == countryCode }
-                ?: CountryLanguageData.countries.first()
-            LanguageSelectionScreen(country = country) {
-                navController.navigate(Screen.Login.route)
             }
         }
         composable(Screen.Login.route) {
