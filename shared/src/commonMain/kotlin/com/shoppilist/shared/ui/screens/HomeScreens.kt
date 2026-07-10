@@ -75,7 +75,9 @@ fun HomeScreen(
     onCreateList: () -> Unit = {},
     onOpenList: (String) -> Unit = {},
     onOpenVoice: () -> Unit = {},
-    onOpenProfile: () -> Unit = {}
+    onOpenProfile: () -> Unit = {},
+    /** When hosted inside the bottom-nav shell, the shell owns the create FAB. */
+    showFab: Boolean = true
 ) {
     val state by viewModel.uiState.collectAsState()
     val listMeta by viewModel.listMeta.collectAsState()
@@ -116,11 +118,13 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onCreateList,
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("New list") }
-            )
+            if (showFab) {
+                ExtendedFloatingActionButton(
+                    onClick = onCreateList,
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("New list") }
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -578,7 +582,8 @@ private fun PickItemsStep(viewModel: CreateListViewModel, onBack: () -> Unit) {
                         SelectableItemRow(
                             name = name,
                             checked = name in state.selected,
-                            onToggle = { viewModel.toggleItem(name) }
+                            onToggle = { viewModel.toggleItem(name) },
+                            categoryId = section.category.categoryId
                         )
                     }
                 }
@@ -634,19 +639,20 @@ private fun CategoryHeader(emoji: String, name: String) {
 }
 
 @Composable
-private fun SelectableItemRow(name: String, checked: Boolean, onToggle: () -> Unit) {
+private fun SelectableItemRow(name: String, checked: Boolean, onToggle: () -> Unit, categoryId: String? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onToggle() }
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 2.dp)
     ) {
         Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        com.shoppilist.shared.ui.components.ItemIcon(name = name, categoryId = categoryId, size = 34.dp)
         Text(
             name.replaceFirstChar { it.uppercase() },
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 4.dp)
+            modifier = Modifier.padding(start = 12.dp)
         )
     }
 }

@@ -114,11 +114,12 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             )
         }
         composable(Screen.Home.route) {
-            HomeScreen(
+            MainShell(
                 onCreateList = { navController.navigate(Screen.CreateList.route) },
                 onOpenList = { listId -> navController.navigate(Screen.ListDetail.createRoute(listId)) },
                 onOpenVoice = { navController.navigate(Screen.Voice.route) },
-                onOpenProfile = { navController.navigate(Screen.Profile.route) }
+                onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) },
+                onLoggedOut = { navController.navigate(Screen.Login.route) { popUpTo(0) } }
             )
         }
         composable(Screen.CreateList.route) {

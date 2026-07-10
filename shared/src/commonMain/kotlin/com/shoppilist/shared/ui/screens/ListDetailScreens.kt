@@ -634,7 +634,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
                 }
             }
         }
@@ -654,7 +654,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { "c_${it.itemId}" }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
                 }
             }
         }
@@ -687,7 +687,7 @@ private fun AisleModeContent(
                 }
             }
             items(group.items, key = { it.itemId }) { itemEntity ->
-                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName)
+                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name })
             }
         }
     }
@@ -741,7 +741,8 @@ private fun ItemRow(
     onUncheck: (ShoppingItemEntity) -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
-    resolveName: suspend (String) -> String? = { null }
+    resolveName: suspend (String) -> String? = { null },
+    categoryLabel: String? = null
 ) {
     // Item 15: show who marked this item purchased ("✓ by Alice").
     var checkedByName by remember(item.itemId, item.checkedBy) { mutableStateOf<String?>(null) }
@@ -758,8 +759,27 @@ private fun ItemRow(
         },
         supportingContent = {
             Column {
-                val qtyLine = "${formatQty(item.quantity)} ${item.unit ?: ""}".trim()
-                if (qtyLine.isNotBlank()) Text(qtyLine, style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val qtyLine = "${formatQty(item.quantity)} ${item.unit ?: ""}".trim()
+                    if (qtyLine.isNotBlank()) {
+                        Text(qtyLine, style = MaterialTheme.typography.bodySmall)
+                        if (categoryLabel != null) Spacer(Modifier.width(8.dp))
+                    }
+                    if (categoryLabel != null) {
+                        // Mockup: a soft category tag (e.g. "Groceries") beside the quantity.
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                categoryLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 val notes = item.notes
                 if (!notes.isNullOrBlank()) Text(notes, style = MaterialTheme.typography.bodySmall)
                 if (item.checked && checkedByName != null) {
@@ -779,12 +799,19 @@ private fun ItemRow(
             }
         },
         leadingContent = {
-            if (selectMode) {
-                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect(item.itemId) })
-            } else {
-                Checkbox(
-                    checked = item.checked,
-                    onCheckedChange = { newValue -> if (newValue) onCheck(item) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selectMode) {
+                    Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect(item.itemId) })
+                } else {
+                    Checkbox(
+                        checked = item.checked,
+                        onCheckedChange = { newValue -> if (newValue) onCheck(item) }
+                    )
+                }
+                com.shoppilist.shared.ui.components.ItemIcon(
+                    name = item.name,
+                    categoryId = item.categoryId,
+                    size = 40.dp
                 )
             }
         },

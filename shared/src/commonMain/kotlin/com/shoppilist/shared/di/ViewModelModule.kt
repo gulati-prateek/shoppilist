@@ -25,4 +25,5 @@ val viewModelModule = module {
     viewModel { AdminViewModel(get(), get()) }
     viewModel { VoiceViewModel(get(), get()) }
     viewModel { ActivityViewModel(get()) }
+    viewModel { CategoriesViewModel(get()) }
 }
