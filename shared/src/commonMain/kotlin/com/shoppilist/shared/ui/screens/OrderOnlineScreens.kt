@@ -28,24 +28,25 @@ private fun RetailerTile(
     onClick: () -> Unit
 ) {
     OutlinedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        // Column, not a side-by-side Row: tiles are ~half the screen wide, and a long
-        // retailer name next to the chip squeezes the chip label into vertical text.
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                "${retailer.logoEmoji} ${retailer.name}",
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (retailer.isSponsored) {
-                Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+            // Brand-colored monogram tile (we don't bundle trademarked logos).
+            com.shoppilist.shared.ui.components.VendorIcon(name = retailer.name, size = 40.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Sponsored",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = SponsoredAmber
+                    retailer.name,
+                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                if (retailer.isSponsored) {
+                    Text(
+                        "Sponsored",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SponsoredAmber
+                    )
+                }
             }
         }
     }

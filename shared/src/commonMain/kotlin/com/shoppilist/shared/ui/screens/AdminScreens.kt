@@ -144,7 +144,7 @@ private fun VendorsTab(viewModel: AdminViewModel) {
     LazyColumn {
         items(retailers, key = { it.id }) { r ->
             ListItem(
-                leadingContent = { Text(r.logoEmoji, style = MaterialTheme.typography.headlineSmall) },
+                leadingContent = { com.shoppilist.shared.ui.components.VendorIcon(name = r.name, size = 36.dp) },
                 headlineContent = { Text(r.name) },
                 supportingContent = {
                     val meta = listOfNotNull(
