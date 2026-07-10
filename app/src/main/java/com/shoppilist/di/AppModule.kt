@@ -8,6 +8,7 @@ import com.shoppilist.backend.FirestoreBackend
 import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.backend.AdminBackend
 import com.shoppilist.shared.backend.CatalogBackend
+import com.shoppilist.shared.backend.CollaborationBackend
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.data.local.AppDatabase
 import com.shoppilist.data.local.seed.DatabaseSeederCallback
@@ -41,4 +42,5 @@ val appModule = module {
     single<CatalogBackend> { get<FirestoreBackend>() }
     single<ProfileBackend> { get<FirestoreBackend>() }
     single<AdminBackend> { get<FirestoreBackend>() }
+    single<CollaborationBackend> { get<FirestoreBackend>() }
 }

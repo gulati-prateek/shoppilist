@@ -4,12 +4,21 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.shoppilist.shared.backend.AdminBackend
 import com.shoppilist.shared.backend.CatalogBackend
+import com.shoppilist.shared.backend.CollaborationBackend
 import com.shoppilist.shared.backend.CustomItemReport
 import com.shoppilist.shared.backend.ProfileBackend
+import com.shoppilist.shared.backend.RemoteActivity
 import com.shoppilist.shared.backend.RemoteCatalogItem
+import com.shoppilist.shared.backend.RemoteInvite
+import com.shoppilist.shared.backend.RemoteList
+import com.shoppilist.shared.backend.RemoteListItem
+import com.shoppilist.shared.backend.RemoteMember
 import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.session.StoredLocation
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -17,7 +26,7 @@ import kotlinx.coroutines.tasks.await
  * [com.shoppilist.shared.backend.CatalogBackend]. Firestore's built-in offline persistence
  * backs the fire-and-forget writes: they queue locally and sync when a connection returns.
  */
-class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend {
+class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend, CollaborationBackend {
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -198,6 +207,163 @@ class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend {
             db.collection("custom_items").document(reportId)
                 .update(mapOf("status" to "rejected", "resolvedAt" to currentTimeMillis()))
                 .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
+    // ---- CollaborationBackend (Phase 4) ----
+
+    private fun lists() = db.collection("lists")
+
+    override fun pushList(list: RemoteList) {
+        lists().document(list.id).set(
+            mapOf(
+                "name" to list.name, "description" to list.description, "colorHex" to list.colorHex,
+                "ownerId" to list.ownerId, "createdAt" to list.createdAt, "updatedAt" to list.updatedAt
+            ).filterValues { it != null }, SetOptions.merge()
+        )
+    }
+
+    override fun deleteList(listId: String) { lists().document(listId).delete() }
+
+    override fun pushItem(listId: String, item: RemoteListItem) {
+        lists().document(listId).collection("items").document(item.id).set(
+            mapOf(
+                "name" to item.name, "quantity" to item.quantity, "unit" to item.unit,
+                "categoryId" to item.categoryId, "checked" to item.checked, "checkedBy" to item.checkedBy,
+                "checkedAt" to item.checkedAt, "addedBy" to item.addedBy, "notes" to item.notes,
+                "updatedAt" to item.updatedAt
+            ).filterValues { it != null }, SetOptions.merge()
+        )
+    }
+
+    override fun deleteItem(listId: String, itemId: String) {
+        lists().document(listId).collection("items").document(itemId).delete()
+    }
+
+    override fun pushMember(listId: String, member: RemoteMember) {
+        lists().document(listId).collection("members").document(member.userId).set(
+            mapOf("userId" to member.userId, "role" to member.role, "name" to member.name, "joinedAt" to member.joinedAt)
+                .filterValues { it != null }, SetOptions.merge()
+        )
+    }
+
+    override fun pushActivity(listId: String, activity: RemoteActivity) {
+        lists().document(listId).collection("activity").document(activity.id).set(
+            mapOf(
+                "actorUserId" to activity.actorUserId, "actorName" to activity.actorName,
+                "action" to activity.action, "itemName" to activity.itemName, "detail" to activity.detail,
+                "createdAt" to activity.createdAt
+            ).filterValues { it != null }
+        )
+    }
+
+    override fun createInvite(invite: RemoteInvite) {
+        db.collection("invitations").document(invite.id).set(
+            mapOf(
+                "listId" to invite.listId, "listName" to invite.listName, "inviterUserId" to invite.inviterUserId,
+                "inviterName" to invite.inviterName, "inviteeContact" to invite.inviteeContact,
+                "channel" to invite.channel, "role" to invite.role, "status" to invite.status,
+                "createdAt" to invite.createdAt, "expiresAt" to invite.expiresAt
+            ).filterValues { it != null }, SetOptions.merge()
+        )
+    }
+
+    override fun observeMyListIds(uid: String): Flow<List<String>> = callbackFlow {
+        val reg = db.collectionGroup("members").whereEqualTo("userId", uid)
+            .addSnapshotListener { snap, _ ->
+                if (snap != null) trySend(snap.documents.mapNotNull { it.reference.parent.parent?.id }.distinct())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeList(listId: String): Flow<RemoteList?> = callbackFlow {
+        val reg = lists().document(listId).addSnapshotListener { doc, _ ->
+            if (doc != null) trySend(
+                if (!doc.exists()) null else RemoteList(
+                    id = doc.id, name = doc.getString("name") ?: "",
+                    description = doc.getString("description"), colorHex = doc.getString("colorHex"),
+                    ownerId = doc.getString("ownerId") ?: "",
+                    createdAt = doc.getLong("createdAt") ?: 0L, updatedAt = doc.getLong("updatedAt") ?: 0L
+                )
+            )
+        }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeItems(listId: String): Flow<List<RemoteListItem>> = callbackFlow {
+        val reg = lists().document(listId).collection("items").addSnapshotListener { snap, _ ->
+            if (snap != null) trySend(snap.documents.map { d ->
+                RemoteListItem(
+                    id = d.id, name = d.getString("name") ?: "", quantity = d.getDouble("quantity") ?: 1.0,
+                    unit = d.getString("unit"), categoryId = d.getString("categoryId"),
+                    checked = d.getBoolean("checked") ?: false, checkedBy = d.getString("checkedBy"),
+                    checkedAt = d.getLong("checkedAt"), addedBy = d.getString("addedBy"),
+                    notes = d.getString("notes"), updatedAt = d.getLong("updatedAt") ?: 0L
+                )
+            })
+        }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeMembers(listId: String): Flow<List<RemoteMember>> = callbackFlow {
+        val reg = lists().document(listId).collection("members").addSnapshotListener { snap, _ ->
+            if (snap != null) trySend(snap.documents.map { d ->
+                RemoteMember(
+                    userId = d.getString("userId") ?: d.id, role = d.getString("role") ?: "EDITOR",
+                    name = d.getString("name"), joinedAt = d.getLong("joinedAt") ?: 0L
+                )
+            })
+        }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeActivity(listId: String): Flow<List<RemoteActivity>> = callbackFlow {
+        val reg = lists().document(listId).collection("activity").addSnapshotListener { snap, _ ->
+            if (snap != null) trySend(snap.documents.map { d ->
+                RemoteActivity(
+                    id = d.id, actorUserId = d.getString("actorUserId") ?: "",
+                    actorName = d.getString("actorName") ?: "Someone", action = d.getString("action") ?: "",
+                    itemName = d.getString("itemName"), detail = d.getString("detail"),
+                    createdAt = d.getLong("createdAt") ?: 0L
+                )
+            }.sortedByDescending { it.createdAt })
+        }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observePendingInvites(contacts: List<String>): Flow<List<RemoteInvite>> = callbackFlow {
+        val filtered = contacts.filter { it.isNotBlank() }.take(10)
+        if (filtered.isEmpty()) { trySend(emptyList()); awaitClose { }; return@callbackFlow }
+        val reg = db.collection("invitations")
+            .whereIn("inviteeContact", filtered)
+            .whereEqualTo("status", "PENDING")
+            .addSnapshotListener { snap, _ ->
+                if (snap != null) trySend(snap.documents.map { d ->
+                    RemoteInvite(
+                        id = d.id, listId = d.getString("listId") ?: "", listName = d.getString("listName"),
+                        inviterUserId = d.getString("inviterUserId") ?: "", inviterName = d.getString("inviterName"),
+                        inviteeContact = d.getString("inviteeContact") ?: "", channel = d.getString("channel"),
+                        role = d.getString("role") ?: "EDITOR", status = d.getString("status") ?: "PENDING",
+                        createdAt = d.getLong("createdAt") ?: 0L, expiresAt = d.getLong("expiresAt")
+                    )
+                })
+            }
+        awaitClose { reg.remove() }
+    }
+
+    override suspend fun acceptInvite(invite: RemoteInvite, userId: String, userName: String?): Result<Unit> =
+        try {
+            val batch = db.batch()
+            batch.set(
+                lists().document(invite.listId).collection("members").document(userId),
+                mapOf("userId" to userId, "role" to invite.role, "name" to userName, "joinedAt" to currentTimeMillis())
+                    .filterValues { it != null }
+            )
+            batch.update(db.collection("invitations").document(invite.id),
+                mapOf("status" to "ACCEPTED", "acceptedAt" to currentTimeMillis()))
+            batch.commit().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

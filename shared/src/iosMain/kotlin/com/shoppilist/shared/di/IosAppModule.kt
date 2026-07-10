@@ -7,9 +7,11 @@ import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.auth.StubAuthService
 import com.shoppilist.shared.backend.AdminBackend
 import com.shoppilist.shared.backend.CatalogBackend
+import com.shoppilist.shared.backend.CollaborationBackend
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.backend.StubAdminBackend
 import com.shoppilist.shared.backend.StubCatalogBackend
+import com.shoppilist.shared.backend.StubCollaborationBackend
 import com.shoppilist.shared.backend.StubProfileBackend
 import com.shoppilist.shared.data.local.AppDatabase
 import com.shoppilist.shared.data.session.SessionManager
@@ -66,4 +68,5 @@ val iosAppModule = module {
     single<CatalogBackend> { StubCatalogBackend() }
     single<ProfileBackend> { StubProfileBackend() }
     single<AdminBackend> { StubAdminBackend() }
+    single<CollaborationBackend> { StubCollaborationBackend() }
 }

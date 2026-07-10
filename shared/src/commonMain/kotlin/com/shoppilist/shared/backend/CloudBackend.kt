@@ -1,6 +1,7 @@
 package com.shoppilist.shared.backend
 
 import com.shoppilist.shared.data.session.StoredLocation
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Cloud (Firestore) integration, abstracted the same way as [com.shoppilist.shared.auth.AuthService]:
@@ -90,4 +91,89 @@ interface AdminBackend {
     ): Result<Unit>
 
     suspend fun rejectCustomItem(reportId: String): Result<Unit>
+}
+
+// ---- Collaboration (Phase 4): cross-device list sharing via Firestore ----
+// Firestore model: lists/{listId} + subcollections items/{itemId}, members/{uid}, activity/{id};
+// top-level invitations/{inviteId} keyed so a recipient can find invites to their email/phone.
+
+data class RemoteList(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val colorHex: String? = null,
+    val ownerId: String,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+data class RemoteListItem(
+    val id: String,
+    val name: String,
+    val quantity: Double = 1.0,
+    val unit: String? = null,
+    val categoryId: String? = null,
+    val checked: Boolean = false,
+    val checkedBy: String? = null,
+    val checkedAt: Long? = null,
+    val addedBy: String? = null,
+    val notes: String? = null,
+    val updatedAt: Long
+)
+
+data class RemoteMember(val userId: String, val role: String, val name: String? = null, val joinedAt: Long)
+
+data class RemoteActivity(
+    val id: String,
+    val actorUserId: String,
+    val actorName: String,
+    val action: String,
+    val itemName: String? = null,
+    val detail: String? = null,
+    val createdAt: Long
+)
+
+data class RemoteInvite(
+    val id: String,
+    val listId: String,
+    val listName: String? = null,
+    val inviterUserId: String,
+    val inviterName: String? = null,
+    val inviteeContact: String,
+    val channel: String? = null,
+    val role: String,
+    val status: String,
+    val createdAt: Long,
+    val expiresAt: Long? = null
+)
+
+/**
+ * Cross-device collaboration transport. Writes are fire-and-forget (Firestore offline-queues them);
+ * observe* return real-time snapshot flows. The local Room DB stays the offline source of truth; a
+ * sync layer mirrors both directions.
+ */
+interface CollaborationBackend {
+    val isAvailable: Boolean
+
+    // Pushes (offline-queued).
+    fun pushList(list: RemoteList)
+    fun deleteList(listId: String)
+    fun pushItem(listId: String, item: RemoteListItem)
+    fun deleteItem(listId: String, itemId: String)
+    fun pushMember(listId: String, member: RemoteMember)
+    fun pushActivity(listId: String, activity: RemoteActivity)
+    fun createInvite(invite: RemoteInvite)
+
+    // Real-time observation.
+    /** List ids the given user is a member of. */
+    fun observeMyListIds(uid: String): Flow<List<String>>
+    fun observeList(listId: String): Flow<RemoteList?>
+    fun observeItems(listId: String): Flow<List<RemoteListItem>>
+    fun observeMembers(listId: String): Flow<List<RemoteMember>>
+    fun observeActivity(listId: String): Flow<List<RemoteActivity>>
+    /** Pending invites addressed to any of the signed-in user's contacts (email/phone). */
+    fun observePendingInvites(contacts: List<String>): Flow<List<RemoteInvite>>
+
+    /** Adds the user to the list's members and flips the invite to ACCEPTED (atomic). */
+    suspend fun acceptInvite(invite: RemoteInvite, userId: String, userName: String?): Result<Unit>
 }
