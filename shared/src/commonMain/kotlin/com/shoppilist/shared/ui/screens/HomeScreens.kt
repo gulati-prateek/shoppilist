@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -508,10 +509,34 @@ private fun PickItemsStep(viewModel: CreateListViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     var search by remember { mutableStateOf("") }
     var customName by remember { mutableStateOf("") }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     fun submitCustom() {
         viewModel.addCustomItem(customName)
         customName = ""
+    }
+
+    val query = search.trim().lowercase()
+    val visibleFrequent = if (query.isEmpty()) state.frequentItems
+    else state.frequentItems.filter { it.contains(query) }
+    // Sections that will actually render (non-empty after the search filter).
+    val visibleSections = state.sections.mapNotNull { section ->
+        val visible = if (query.isEmpty()) section.itemNames else section.itemNames.filter { it.contains(query) }
+        if (visible.isNotEmpty()) section to visible else null
+    }
+
+    // C1: flat LazyColumn index of a category's header, so tapping a category chip scrolls to it
+    // (rather than jumping to the top). Mirrors the exact render order below.
+    fun indexOfCategory(categoryId: String): Int {
+        var idx = 0
+        if (visibleFrequent.isNotEmpty()) idx += 1 + visibleFrequent.size
+        if (state.customItems.isNotEmpty()) idx += 1 + state.customItems.size
+        for ((section, visible) in visibleSections) {
+            if (section.category.categoryId == categoryId) return idx
+            idx += 1 + visible.size
+        }
+        return idx
     }
 
     Column(
@@ -538,15 +563,30 @@ private fun PickItemsStep(viewModel: CreateListViewModel, onBack: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
 
+        // C1: category quick-jump — tapping scrolls the list to that category's items.
+        if (visibleSections.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(visibleSections, key = { it.first.category.categoryId }) { (section, _) ->
+                    AssistChip(
+                        onClick = {
+                            scope.launch { listState.animateScrollToItem(indexOfCategory(section.category.categoryId)) }
+                        },
+                        label = { Text("${section.category.emoji} ${section.category.name}") }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         if (state.loadingCatalog) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
-        val query = search.trim().lowercase()
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
             // Previously-added items, ranked by frequency — pinned above every other section.
-            val visibleFrequent = if (query.isEmpty()) state.frequentItems
-            else state.frequentItems.filter { it.contains(query) }
             if (visibleFrequent.isNotEmpty()) {
                 item(key = "frequent-header") {
                     CategoryHeader("⭐", "Frequently Added")
