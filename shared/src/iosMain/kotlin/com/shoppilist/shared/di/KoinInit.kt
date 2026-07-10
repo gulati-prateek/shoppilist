@@ -26,10 +26,17 @@ fun initKoinIos() {
     // Android seeds via a RoomDatabase.Callback.onCreate() hook (needs SupportSQLiteDatabase,
     // no Kotlin/Native equivalent); this is the iOS substitute -- a plain first-launch check
     // against a DAO that already exists everywhere, run once right after Koin resolves the DB.
-    val db = koinApp.koin.get<AppDatabase>()
+    // A bare CoroutineScope(...).launch has no exception handler, so any failure here (a
+    // seeding bug, a locked DB file, anything) would otherwise crash the whole app at launch --
+    // an empty/partial catalog is recoverable, a crashed launch is not, so this must not throw.
     CoroutineScope(Dispatchers.Default).launch {
-        if (db.itemCategoryDao().count() == 0) {
-            DatabaseSeeder.seed(db)
+        try {
+            val db = koinApp.koin.get<AppDatabase>()
+            if (db.itemCategoryDao().count() == 0) {
+                DatabaseSeeder.seed(db)
+            }
+        } catch (e: Throwable) {
+            // Best-effort seeding; swallow and let the app continue with whatever landed.
         }
     }
 }
