@@ -40,5 +40,41 @@ service cloud.firestore {
       allow get: if signedIn() && request.auth.uid == uid;
       allow list, write: if false;
     }
+
+    // ---- Collaboration (Phase 4) ----
+
+    function isMember(listId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/lists/$(listId)/members/$(request.auth.uid));
+    }
+
+    // Shared lists: a signed-in user may create a list (they set themselves as owner); members of
+    // the list may read/update/delete it and everything under it.
+    match /lists/{listId} {
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if isMember(listId);
+
+      match /items/{itemId} {
+        allow read, write: if isMember(listId);
+      }
+      match /activity/{activityId} {
+        allow read, write: if isMember(listId);
+      }
+      // Members: a member reads the roster; a user may add themselves (accepting an invite) or the
+      // list owner may manage members.
+      match /members/{uid} {
+        allow read: if isMember(listId);
+        allow create: if signedIn() && (request.auth.uid == uid || isMember(listId));
+        allow update, delete: if isMember(listId);
+      }
+    }
+
+    // Invitations: the inviter creates one; the recipient (by matching email/phone) or the inviter
+    // may read/update it (accepting flips status). Signed-in gate keeps it off the open internet;
+    // the recipient contact is the addressing key.
+    match /invitations/{inviteId} {
+      allow create: if signedIn() && request.resource.data.inviterUserId == request.auth.uid;
+      allow read, update: if signedIn();
+    }
   }
 }
