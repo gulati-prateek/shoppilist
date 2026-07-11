@@ -50,7 +50,7 @@ import com.shoppilist.shared.data.local.ShoppingItemEntity
 import com.shoppilist.shared.presentation.AmbiguousCategoryPrompt
 import com.shoppilist.shared.presentation.ListDetailViewModel
 
-private enum class ListViewMode { LIST, AISLE, MY_ITEMS }
+private enum class ListViewMode { TO_GET, CART, AISLE, MY_ITEMS }
 
 private data class CategoryGroup(
     val categoryId: String,
@@ -106,7 +106,7 @@ fun ListDetailScreen(
     val haptic = LocalHapticFeedback.current
     val currentUserId = viewModel.currentUserId
 
-    var viewMode by remember { mutableStateOf(ListViewMode.LIST) }
+    var viewMode by remember { mutableStateOf(ListViewMode.TO_GET) }
     var itemName by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("1") }
     var unit by remember { mutableStateOf("") }
@@ -322,10 +322,12 @@ fun ListDetailScreen(
                         ) {
                             Text(
                                 when (mode) {
-                                    ListViewMode.LIST -> "List"
+                                    ListViewMode.TO_GET -> "To Get"
+                                    ListViewMode.CART -> "Cart"
                                     ListViewMode.AISLE -> "Aisle"
                                     ListViewMode.MY_ITEMS -> "My Items"
-                                }
+                                },
+                                maxLines = 1
                             )
                         }
                     }
@@ -354,8 +356,29 @@ fun ListDetailScreen(
 
             Box(modifier = Modifier.weight(1f)) {
                 when (viewMode) {
-                    ListViewMode.LIST -> GroupedListModeContent(
-                        items = items,
+                    // "To Get" and "Cart" are separate top-level tabs (user request) instead of
+                    // two sections stacked vertically inside one "List" view.
+                    ListViewMode.TO_GET -> GroupedListModeContent(
+                        title = "To Get",
+                        items = items.filter { !it.checked },
+                        emptyHint = "Nothing left to get 🎉 — add items above, or see what's in the Cart tab.",
+                        categoryById = categoryById,
+                        selectMode = selectMode,
+                        selectedIds = selectedIds,
+                        onToggleSelect = onToggleSelect,
+                        onCheck = onCheck,
+                        onUncheck = onUncheck,
+                        onOpenItem = onOpenItem,
+                        onOpenAssignee = { assigneeTargetItem = it },
+                        resolveName = { viewModel.resolveUserName(it) },
+                        staged = stagedForCart,
+                        onEdit = { if (!readOnly) editTargetItem = it },
+                        onQuantityChange = { id, d -> if (!readOnly) viewModel.changeQuantity(id, d) }
+                    )
+                    ListViewMode.CART -> GroupedListModeContent(
+                        title = "In Cart",
+                        items = items.filter { it.checked },
+                        emptyHint = "Your cart is empty — tick items in To Get, then tap \"Move to Cart\".",
                         categoryById = categoryById,
                         selectMode = selectMode,
                         selectedIds = selectedIds,
@@ -555,7 +578,9 @@ fun ListDetailScreen(
             title = { Text("List views") },
             text = {
                 Column {
-                    ModeInfoLine("List", "Your items split into To Get and In Cart, grouped by category.")
+                    ModeInfoLine("To Get", "What's still to pick up, grouped by category. Tick items to stage them, then tap \"Move to Cart\".")
+                    Spacer(Modifier.height(8.dp))
+                    ModeInfoLine("Cart", "Everything already in your cart. Untick an item to send it back to To Get.")
                     Spacer(Modifier.height(8.dp))
                     ModeInfoLine("Aisle", "Every item grouped by store aisle (category) in aisle order, so you shop row by row.")
                     Spacer(Modifier.height(8.dp))
@@ -963,7 +988,9 @@ private fun CategoryHeaderRow(group: CategoryGroup, expanded: Boolean, onToggle:
 
 @Composable
 private fun GroupedListModeContent(
+    title: String,
     items: List<ShoppingItemEntity>,
+    emptyHint: String,
     categoryById: Map<String, ItemCategoryEntity>,
     selectMode: Boolean,
     selectedIds: Set<String>,
@@ -977,48 +1004,37 @@ private fun GroupedListModeContent(
     onEdit: (ShoppingItemEntity) -> Unit = {},
     onQuantityChange: (String, Double) -> Unit = { _, _ -> }
 ) {
+    // One tab = one section: "To Get" and "Cart" are separate top-level view modes now, so this
+    // renders a single pre-filtered set of items grouped by category.
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
-    val unchecked = items.filter { !it.checked }
-    val checked = items.filter { it.checked }
-    val uncheckedGroups = remember(unchecked, categoryById) { groupByCategory(unchecked, categoryById) }
-    val checkedGroups = remember(checked, categoryById) { groupByCategory(checked, categoryById) }
+    val groups = remember(items, categoryById) { groupByCategory(items, categoryById) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item(key = "header_to_get") {
+        item(key = "section_header") {
             Text(
-                "To Get (${unchecked.size})",
+                "$title (${items.size})",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(16.dp, 8.dp)
             )
         }
-        uncheckedGroups.forEach { group ->
-            val key = "u_${group.categoryId}"
-            val isExpanded = expanded[key] ?: true
-            item(key = key) {
-                CategoryHeaderRow(group, isExpanded) { expanded[key] = !isExpanded }
-            }
-            if (isExpanded) {
-                items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
-                }
+        if (items.isEmpty()) {
+            item(key = "empty_hint") {
+                Text(
+                    emptyHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
+                )
             }
         }
-        item(key = "header_in_cart") {
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Text(
-                "In Cart (${checked.size})",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp, 8.dp)
-            )
-        }
-        checkedGroups.forEach { group ->
-            val key = "c_${group.categoryId}"
+        groups.forEach { group ->
+            val key = group.categoryId
             val isExpanded = expanded[key] ?: true
             item(key = "hdr_$key") {
                 CategoryHeaderRow(group, isExpanded) { expanded[key] = !isExpanded }
             }
             if (isExpanded) {
-                items(group.items, key = { "c_${it.itemId}" }) { itemEntity ->
+                items(group.items, key = { it.itemId }) { itemEntity ->
                     ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
                 }
             }
