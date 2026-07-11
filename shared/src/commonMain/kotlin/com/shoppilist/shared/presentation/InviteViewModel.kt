@@ -17,14 +17,17 @@ import kotlinx.coroutines.launch
 data class InviteUiState(
     val members: List<ListMemberEntity> = emptyList(),
     val memberNames: Map<String, String> = emptyMap(),
-    val lastInviteLink: String? = null,
+    /** Contact of the most recently created invite — drives the "invite sent" confirmation row. */
+    val lastInvitedContact: String? = null,
     /** One-shot signal: a just-created invite the UI should hand to the SMS/email composer. */
     val outgoingInvite: OutgoingInvite? = null,
     val error: String? = null
 )
 
-/** What the platform composer needs to pre-fill the invite message. */
-data class OutgoingInvite(val contact: String, val channel: String, val link: String)
+/** What the platform composer needs to pre-fill the invite message. No web link: the invite is
+ *  delivered in-app via Firestore keyed by the invitee's contact, and there is no hosted domain
+ *  yet — a `shoppilist.app/join/...` URL would just 404 (user-reported). */
+data class OutgoingInvite(val contact: String, val channel: String)
 
 class InviteViewModel(
     private val getListMembersUseCase: GetListMembersUseCase,
@@ -54,11 +57,10 @@ class InviteViewModel(
             result.onSuccess { invite ->
                 // Phase 4: push the list + the invite to Firestore so the recipient's device sees it.
                 collaborationSync.shareAndInvite(invite)
-                val link = "shoppilist.app/join/${invite.token}"
                 _uiState.value = _uiState.value.copy(
-                    lastInviteLink = link,
+                    lastInvitedContact = contact.trim(),
                     // Hand off to the platform SMS/email composer (consumed by the screen).
-                    outgoingInvite = OutgoingInvite(contact = contact.trim(), channel = channel, link = link),
+                    outgoingInvite = OutgoingInvite(contact = contact.trim(), channel = channel),
                     error = null
                 )
             }.onFailure {

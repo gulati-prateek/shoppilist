@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.ListActivityAction
@@ -30,6 +31,7 @@ fun ActivityScreen(
     val activity by viewModel.activity.collectAsState()
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Activity") },

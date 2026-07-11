@@ -45,21 +45,20 @@ fun SplashScreen(
         // brief moment it's visible reads as the login page loading, not a separate screen.
         onResolved(viewModel.resolveStartDestination())
     }
-    com.shoppilist.shared.ui.components.AuthBackground {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "ShoppiList",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text("Shop anything, together — groceries, fashion, electronics & more.", style = MaterialTheme.typography.bodyMedium)
-            }
+    // The themed backdrop is now global (AppNavigation wraps every screen in AuthBackground).
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "ShoppiList",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text("Shop anything, together — groceries, fashion, electronics & more.", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -401,7 +400,6 @@ fun LoginScreen(
         )
     }
 
-    com.shoppilist.shared.ui.components.AuthBackground {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -489,7 +487,6 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onCreateAccount) { Text("New here? Create an account") }
     }
-    }
 }
 
 @Composable
@@ -510,7 +507,6 @@ fun RegisterScreen(
 
     LaunchedEffect(state.verifiedUser) { if (state.verifiedUser != null) onRegisterSuccess(state.needsProfile) }
 
-    com.shoppilist.shared.ui.components.AuthBackground {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -586,7 +582,6 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onLogin) { Text("Already have an account? Log in") }
-    }
     }
 }
 

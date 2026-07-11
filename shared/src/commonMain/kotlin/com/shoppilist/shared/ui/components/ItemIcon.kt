@@ -27,41 +27,143 @@ private val CATEGORY_EMOJI: Map<String, String> = mapOf(
     "kitchenware_cookware" to "🍳", "bedding_linen" to "🛏️", "storage_organization" to "🗄️"
 )
 
-/** Common item-name keywords -> emoji, checked before falling back to the category icon so the
- *  list rows show recognizable thumbnails (mockup: spinach, milk, bread, eggs, apple…). */
+/**
+ * Common item-name keywords -> emoji, checked before falling back to the category icon so the
+ * list rows show recognizable thumbnails. Matching is TOKEN-PREFIX based (see [emojiForItem]):
+ * a single-word keyword must be the start of a whole word of the item name, so "oat" no longer
+ * matches "cOATs", "cola" no longer matches "choCOLAte", "pan" no longer matches "PANts", and
+ * "phone" no longer matches "headPHONEs". Keywords containing a space are matched as phrases.
+ * The list is evaluated LONGEST KEYWORD FIRST (ties keep this order), so specific entries like
+ * "eggplant"/"pancake"/"headphone" naturally beat "egg"/"pan"/"phone".
+ */
 private val ITEM_KEYWORD_EMOJI: List<Pair<String, String>> = listOf(
-    "spinach" to "🥬", "lettuce" to "🥬", "cabbage" to "🥬", "kale" to "🥬",
-    "milk" to "🥛", "yogurt" to "🥛", "curd" to "🥛", "cheese" to "🧀", "butter" to "🧈",
-    "bread" to "🍞", "baguette" to "🥖", "croissant" to "🥐", "bagel" to "🥯",
-    "egg" to "🥚", "apple" to "🍎", "banana" to "🍌", "orange" to "🍊", "lemon" to "🍋",
-    "grape" to "🍇", "strawberr" to "🍓", "watermelon" to "🍉", "melon" to "🍈", "pineapple" to "🍍",
-    "mango" to "🥭", "peach" to "🍑", "cherr" to "🍒", "pear" to "🍐", "kiwi" to "🥝",
-    "coconut" to "🥥", "avocado" to "🥑", "tomato" to "🍅", "potato" to "🥔", "carrot" to "🥕",
-    "corn" to "🌽", "cucumber" to "🥒", "pepper" to "🫑", "chilli" to "🌶️", "chili" to "🌶️",
+    // Vegetables & herbs
+    "spinach" to "🥬", "lettuce" to "🥬", "cabbage" to "🥬", "kale" to "🥬", "celery" to "🥬",
+    "bok choy" to "🥬", "mint" to "🌿", "basil" to "🌿", "parsley" to "🌿", "coriander" to "🌿",
+    "cilantro" to "🌿", "dill" to "🌿", "rosemary" to "🌿", "thyme" to "🌿", "oregano" to "🌿",
+    "lemongrass" to "🌿", "curry leav" to "🌿", "peppermint" to "🌿", "sprout" to "🌱",
+    "tomato" to "🍅", "potato" to "🥔", "sweet potato" to "🍠", "carrot" to "🥕",
+    "cucumber" to "🥒", "zucchini" to "🥒", "pepper" to "🫑", "chilli" to "🌶️", "chili" to "🌶️",
     "onion" to "🧅", "garlic" to "🧄", "mushroom" to "🍄", "broccoli" to "🥦", "eggplant" to "🍆",
+    "aubergine" to "🍆", "pumpkin" to "🎃", "corn" to "🌽", "avocado" to "🥑",
+    // Fruit
+    "apple" to "🍎", "banana" to "🍌", "orange" to "🍊", "clementine" to "🍊", "tangerine" to "🍊",
+    "mandarin" to "🍊", "grapefruit" to "🍊", "lemon" to "🍋", "lime" to "🍋", "grape" to "🍇",
+    "raisin" to "🍇", "strawberr" to "🍓", "blueberr" to "🫐", "blackberr" to "🫐",
+    "raspberr" to "🫐", "cranberr" to "🍒", "berr" to "🫐", "watermelon" to "🍉",
+    "muskmelon" to "🍈", "melon" to "🍈", "pineapple" to "🍍", "mango" to "🥭", "papaya" to "🥭",
+    "peach" to "🍑", "apricot" to "🍑", "cherr" to "🍒", "pear" to "🍐", "kiwi" to "🥝",
+    "coconut" to "🥥",
+    // Dairy & eggs
+    "buttermilk" to "🥛", "milkshake" to "🥤", "milk" to "🥛", "yogurt" to "🥛", "yoghurt" to "🥛",
+    "curd" to "🥛", "lassi" to "🥛", "cheesecake" to "🍰", "cheese" to "🧀", "paneer" to "🧀",
+    "butter" to "🧈", "ghee" to "🧈", "egg" to "🥚",
+    // Bakery
+    "bread" to "🍞", "baguette" to "🥖", "croissant" to "🥐", "bagel" to "🥯", "toaster" to "🍞",
+    "pancake" to "🥞", "cupcake" to "🧁", "muffin" to "🧁", "cake" to "🍰", "brownie" to "🍫",
+    "donut" to "🍩", "doughnut" to "🍩", "pastry" to "🥐", "pie" to "🥧", "waffle" to "🧇",
+    "pizza" to "🍕", "pepperoni" to "🍕", "roti" to "🫓", "naan" to "🫓", "chapati" to "🫓",
+    "paratha" to "🫓", "tortilla" to "🫓", "pita" to "🫓", "shortbread" to "🍪",
+    // Meat & seafood
     "chicken" to "🍗", "meat" to "🥩", "beef" to "🥩", "steak" to "🥩", "bacon" to "🥓",
-    "fish" to "🐟", "salmon" to "🐟", "prawn" to "🦐", "shrimp" to "🦐", "crab" to "🦀",
+    "mutton" to "🍖", "lamb" to "🍖", "pork" to "🍖", "salami" to "🍖", "turkey" to "🦃",
+    "duck" to "🦆", "sausage" to "🌭", "hot dog" to "🌭", "hotdog" to "🌭", "kebab" to "🍢",
+    "fish" to "🐟", "salmon" to "🐟", "tuna" to "🐟", "sardine" to "🐟", "mackerel" to "🐟",
+    "pomfret" to "🐟", "tilapia" to "🐟", "basa" to "🐟", "cod" to "🐟", "prawn" to "🦐",
+    "shrimp" to "🦐", "crab" to "🦀", "lobster" to "🦞", "octopus" to "🐙", "squid" to "🦑",
+    // Staples & packaged
     "rice" to "🍚", "pasta" to "🍝", "noodle" to "🍜", "flour" to "🌾", "oat" to "🥣",
-    "coffee" to "☕", "tea" to "🍵", "water" to "💧", "juice" to "🧃", "soda" to "🥤",
-    "cola" to "🥤", "beer" to "🍺", "wine" to "🍷", "chocolate" to "🍫", "candy" to "🍬",
-    "cookie" to "🍪", "chip" to "🍟", "popcorn" to "🍿", "honey" to "🍯", "jam" to "🍓",
-    "salt" to "🧂", "sugar" to "🍬", "oil" to "🫒", "ketchup" to "🍅", "ice cream" to "🍦",
-    "soap" to "🧼", "shampoo" to "🧴", "toothpaste" to "🪥", "toothbrush" to "🪥", "tissue" to "🧻",
-    "toilet paper" to "🧻", "detergent" to "🧴", "diaper" to "🧷", "baby" to "🍼",
-    "phone" to "📱", "laptop" to "💻", "charger" to "🔌", "headphone" to "🎧", "camera" to "📷",
-    "shirt" to "👕", "jean" to "👖", "dress" to "👗", "shoe" to "👟", "sock" to "🧦",
-    "watch" to "⌚", "ring" to "💍", "bag" to "👜", "perfume" to "🌸", "gift" to "🎁",
-    "pan" to "🍳", "plate" to "🍽️", "cup" to "🥤", "towel" to "🧻", "pillow" to "🛏️",
-    "medicine" to "💊", "vitamin" to "💊", "bandage" to "🩹"
+    "cornflake" to "🥣", "cereal" to "🥣", "granola" to "🥣", "muesli" to "🥣", "bran" to "🥣",
+    "baking soda" to "🧂", "baking powder" to "🧂", "black pepper" to "🧂", "salt" to "🧂",
+    "sugar" to "🍬", "oil" to "🫒", "ketchup" to "🍅", "saucepan" to "🍳", "sauce" to "🥫",
+    "honey" to "🍯", "cough syrup" to "💊", "syrup" to "🍯", "jam" to "🍓", "dumpling" to "🥟",
+    "momo" to "🥟", "samosa" to "🥟", "fries" to "🍟", "burrito" to "🌯",
+    // Beverages
+    "coffee" to "☕", "tea" to "🍵", "kettle" to "🫖", "water" to "💧", "juice" to "🧃",
+    "soda" to "🥤", "cola" to "🥤", "soft drink" to "🥤", "smoothie" to "🥤", "beer" to "🍺",
+    "wine" to "🍷",
+    // Snacks & sweets
+    "chocolate" to "🍫", "candy" to "🍬", "gum" to "🍬", "cookie" to "🍪", "wafer" to "🍪",
+    "biscuit" to "🍪", "cracker" to "🥨", "pretzel" to "🥨", "chip" to "🍟", "popcorn" to "🍿",
+    "ice cream" to "🍦", "icecream" to "🍦", "peanut" to "🥜", "almond" to "🥜",
+    "cashew" to "🥜", "pista" to "🥜", "walnut" to "🥜", "nut" to "🥜",
+    // Household & cleaning
+    "soap" to "🧼", "shampoo" to "🧴", "toothpaste" to "🪥", "toothbrush" to "🪥",
+    "tissue" to "🧻", "toilet paper" to "🧻", "napkin" to "🧻", "detergent" to "🧴",
+    "laundry" to "🧺", "basket" to "🧺", "mop" to "🧹", "sponge" to "🧽", "dishwash" to "🧽",
+    "candle" to "🕯️", "bucket" to "🪣", "trash bag" to "🗑️", "garbage bag" to "🗑️",
+    "vacuum" to "🧹",
+    // Baby & pets
+    "diaper" to "🧷", "wipe" to "🧻", "sock" to "🧦", "shoe" to "👟", "baby" to "🍼",
+    "dog" to "🐕", "cat" to "🐈", "bird" to "🐦", "hamster" to "🐹", "rabbit" to "🐰",
+    "aquarium" to "🐠",
+    // Electronics
+    "smartphone" to "📱", "iphone" to "📱", "phone" to "📱", "laptop" to "💻",
+    "charger" to "🔌", "adapter" to "🔌", "cable" to "🔌", "plug" to "🔌",
+    "battery" to "🔋", "batteries" to "🔋", "power bank" to "🔋", "powerbank" to "🔋",
+    "headphone" to "🎧", "earbud" to "🎧", "earphone" to "🎧", "airpod" to "🎧",
+    "speaker" to "🔊", "soundbar" to "🔊", "television" to "📺", "tv" to "📺",
+    "camera" to "📷", "webcam" to "📷", "mouse" to "🖱️", "keyboard" to "⌨️",
+    "monitor" to "🖥️", "printer" to "🖨️", "pendrive" to "💾", "pen drive" to "💾",
+    "usb" to "💾", "torch" to "🔦", "flashlight" to "🔦", "bulb" to "💡", "lamp" to "💡",
+    "joystick" to "🕹️", "capture" to "🎮",
+    // Clothing & fashion
+    "sweatshirt" to "🧥", "shirt" to "👕", "blouse" to "👚", "jean" to "👖", "pant" to "👖",
+    "trouser" to "👖", "legging" to "👖", "capri" to "👖", "pajama" to "👖", "pyjama" to "👖",
+    "short" to "🩳", "dress" to "👗", "frock" to "👗", "skirt" to "👗", "lehenga" to "👗",
+    "saree" to "🥻", "sari" to "🥻", "kurta" to "👕", "coat" to "🧥", "jacket" to "🧥",
+    "blazer" to "🧥", "hoodie" to "🧥", "sweater" to "🧥", "cardigan" to "🧥",
+    "scarf" to "🧣", "shawl" to "🧣", "dupatta" to "🧣", "glove" to "🧤", "tie" to "👔",
+    "suitcase" to "🧳", "briefcase" to "🧳", "luggage" to "🧳", "trolley" to "🧳",
+    "suit" to "👔", "capsule" to "💊", "cap" to "🧢", "beanie" to "🧢", "hat" to "👒",
+    "underwear" to "🩲", "boxer" to "🩲", "brief" to "🩲", "bracelet" to "📿", "bra" to "👙",
+    "sandal" to "👡", "slipper" to "🩴", "flip flop" to "🩴", "heel" to "👠", "boot" to "🥾",
+    "sneaker" to "👟", "sunglasses" to "🕶️", "goggles" to "🕶️",
+    // Watches, jewelry & bags
+    "watch" to "⌚", "earring" to "💎", "brooch" to "💎", "ring" to "💍", "necklace" to "📿",
+    "pendant" to "📿", "chain" to "📿", "bangle" to "📿", "anklet" to "📿",
+    "backpack" to "🎒", "purse" to "👛", "wallet" to "👛", "clutch" to "👛", "bag" to "👜",
+    "perfume" to "🌸", "cologne" to "🌸", "sandalwood" to "🌸",
+    // Personal care & pharmacy
+    "razor" to "🪒", "shav" to "🪒", "lipstick" to "💄", "mascara" to "💄", "kajal" to "💄",
+    "foundation" to "💄", "nail polish" to "💅", "mirror" to "🪞", "beard oil" to "🧴",
+    "medicine" to "💊", "vitamin" to "💊", "painkiller" to "💊", "cough" to "💊",
+    "bandage" to "🩹", "band" to "🩹", "first aid" to "🩹", "thermometer" to "🌡️",
+    "syringe" to "💉",
+    // Kitchen & home
+    "pancetta" to "🥓", "pancake mix" to "🥞", "paneer tikka" to "🧀", "pan" to "🍳",
+    "knife" to "🔪", "knives" to "🔪", "cutting board" to "🔪", "chopping board" to "🔪",
+    "spoon" to "🥄", "fork" to "🍴", "plate" to "🍽️", "bowl" to "🥣", "colander" to "🥣",
+    "cup" to "🥤", "glass" to "🥛", "pressure cooker" to "🍲", "cooker" to "🍲", "wok" to "🥘",
+    "kadai" to "🥘", "kadhai" to "🥘", "tawa" to "🍳", "casserole" to "🥘", "lunch box" to "🍱",
+    "tiffin" to "🍱", "cupboard" to "🗄️", "towel" to "🧻", "pillow" to "🛏️",
+    // Gifts & stationery
+    "gift" to "🎁", "pencil" to "✏️", "pen" to "🖊️", "marker" to "🖊️", "crayon" to "🖍️",
+    "notebook" to "📓", "diary" to "📓", "envelope" to "✉️", "greeting card" to "💌",
+    "balloon" to "🎈", "ribbon" to "🎀", "toy" to "🧸", "teddy" to "🧸", "doll" to "🧸",
+    "puzzle" to "🧩", "board game" to "🎲"
 )
+
+/** Evaluated longest-first so specific keywords ("eggplant", "headphone") beat short ones. */
+private val SORTED_KEYWORDS: List<Pair<String, String>> =
+    ITEM_KEYWORD_EMOJI.sortedByDescending { it.first.length }
+
+private val TOKEN_SPLIT = Regex("[^a-z0-9]+")
 
 /**
  * Best-effort emoji for an item — a specific name-keyword match first, then the item's category
  * icon. Returns null when neither matches so callers can supply their own fallback.
+ *
+ * Single-word keywords match as a PREFIX OF A WHOLE WORD (so "oat" hits "oats" but not "coats");
+ * keywords with a space match as a contained phrase.
  */
 fun emojiForItem(name: String, categoryId: String?): String? {
     val lower = name.lowercase()
-    ITEM_KEYWORD_EMOJI.firstOrNull { lower.contains(it.first) }?.let { return it.second }
+    val tokens = lower.split(TOKEN_SPLIT).filter { it.isNotEmpty() }
+    for ((keyword, emoji) in SORTED_KEYWORDS) {
+        val hit = if (' ' in keyword) lower.contains(keyword) else tokens.any { it.startsWith(keyword) }
+        if (hit) return emoji
+    }
     return categoryId?.let { CATEGORY_EMOJI[it] }
 }
 

@@ -60,6 +60,7 @@ fun ItemOrderOnlineScreen(
     val uriHandler = LocalUriHandler.current
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(item?.name ?: "Order Online") },
@@ -127,6 +128,7 @@ fun OrderWholeListScreen(
     LaunchedEffect(listId) { viewModel.loadRetailersOnly() }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Order All Online") },

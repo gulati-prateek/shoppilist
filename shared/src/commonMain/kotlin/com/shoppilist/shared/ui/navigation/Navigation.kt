@@ -60,6 +60,9 @@ sealed class Screen(val route: String) {
 fun AppNavigation(startScreen: String = Screen.Splash.route) {
     val navController = rememberNavController()
 
+    // The themed backdrop (sage→cream→gold gradient + faded category watermarks) sits behind
+    // EVERY screen; screens keep their Scaffolds transparent so it shows through.
+    com.shoppilist.shared.ui.components.AuthBackground {
     NavHost(
         navController = navController,
         startDestination = startScreen,
@@ -186,6 +189,7 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
         composable(Screen.AdminDashboard.route) {
             AdminDashboardScreen(onBack = { navController.popBackStack() })
         }
+    }
     }
 }
 

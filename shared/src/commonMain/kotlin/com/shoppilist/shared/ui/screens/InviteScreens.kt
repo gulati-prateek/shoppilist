@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -18,6 +19,12 @@ import com.shoppilist.shared.resources.*
 import com.shoppilist.shared.data.local.ListRole
 import com.shoppilist.shared.messaging.rememberMessageComposer
 import com.shoppilist.shared.presentation.InviteViewModel
+
+/** The message handed to SMS/email. Deliberately link-free: invites are delivered inside the app
+ *  (keyed by the invitee's contact), and no shoppilist.app website exists yet to link to. */
+private fun inviteMessageBody(contact: String): String =
+    "You're invited to a shared shopping list on ShoppiList! Install the ShoppiList app and " +
+        "sign in with $contact — the invitation will be waiting on your home screen."
 
 @Composable
 private fun roleLabel(role: ListRole): String = when (role) {
@@ -47,12 +54,13 @@ fun InviteScreen(
 
     // A created invite hands off to the user's SMS/email app so it's actually sent, not just
     // generated. One-shot: consumed immediately so recompositions don't re-open the composer.
+    // No web link in the message — the invitation is delivered inside the app (Firestore, keyed
+    // by the invitee's contact); a shoppilist.app URL would lead nowhere today.
     LaunchedEffect(state.outgoingInvite) {
         state.outgoingInvite?.let { out ->
-            val body = "Join my shopping list on ShoppiList! Install the app and sign in as " +
-                "${out.contact} to accept, or use this link: https://${out.link}"
+            val body = inviteMessageBody(out.contact)
             val opened = if (out.channel == "email") {
-                composer.composeEmail(out.contact, "You're invited to a ShoppiList list", body)
+                composer.composeEmail(out.contact, "You're invited to a ShoppiList shopping list", body)
             } else {
                 composer.composeSms(out.contact, body)
             }
@@ -62,6 +70,7 @@ fun InviteScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(Res.string.title_invite)) },
@@ -118,17 +127,23 @@ fun InviteScreen(
             composeFailedChannel?.let { failed ->
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (failed == "email") "Couldn't open an email app — copy the link below and share it yourself."
-                    else "Couldn't open an SMS app — copy the link below and share it yourself.",
+                    if (failed == "email") "Couldn't open an email app — copy the invite message below and share it yourself."
+                    else "Couldn't open an SMS app — copy the invite message below and share it yourself.",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            state.lastInviteLink?.let { link ->
+            state.lastInvitedContact?.let { invited ->
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Or share link: $link", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { clipboard.setText(AnnotatedString(link)) }) { Text(stringResource(Res.string.action_copy)) }
+                    Text(
+                        "Invite sent to $invited — it appears in their ShoppiList app once they sign in with that ${if (invited.contains("@")) "email" else "number"}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(inviteMessageBody(invited))) }) {
+                        Text(stringResource(Res.string.action_copy))
+                    }
                 }
             }
             state.error?.let {
