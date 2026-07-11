@@ -21,6 +21,7 @@ import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -45,7 +46,9 @@ class CollaborationSyncManager(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var started = false
-    private val observing = mutableSetOf<String>()
+    // One mirror Job per shared list, so its snapshot listeners can be torn down when the list is
+    // no longer shared with this user. Only ever touched from the single observeMyListIds collector.
+    private val mirrorJobs = mutableMapOf<String, Job>()
 
     /** Begins mirroring the signed-in user's shared lists from Firestore into Room. Idempotent. */
     fun start() {
@@ -54,21 +57,21 @@ class CollaborationSyncManager(
         started = true
         scope.launch {
             backend.observeMyListIds(uid).collect { listIds ->
-                listIds.forEach { id -> if (observing.add(id)) mirror(id) }
+                val current = listIds.toSet()
+                // Start mirroring newly-shared lists.
+                current.forEach { id -> if (id !in mirrorJobs) mirrorJobs[id] = mirror(id) }
+                // Tear down listeners for lists no longer shared with this user (un-share / removed).
+                (mirrorJobs.keys - current).forEach { id -> mirrorJobs.remove(id)?.cancel() }
             }
         }
     }
 
-    private fun mirror(listId: String) {
-        scope.launch {
-            backend.observeList(listId).collect { rl -> rl?.let { upsertList(it) } }
-        }
-        scope.launch {
-            backend.observeItems(listId).collect { remoteItems -> mirrorItems(listId, remoteItems) }
-        }
-        scope.launch {
-            backend.observeMembers(listId).collect { members -> mirrorMembers(listId, members) }
-        }
+    /** Launches the three per-list snapshot collectors as children of one Job, so cancelling the
+     *  returned Job stops all of them. */
+    private fun mirror(listId: String): Job = scope.launch {
+        launch { backend.observeList(listId).collect { rl -> rl?.let { upsertList(it) } } }
+        launch { backend.observeItems(listId).collect { remoteItems -> mirrorItems(listId, remoteItems) } }
+        launch { backend.observeMembers(listId).collect { members -> mirrorMembers(listId, members) } }
     }
 
     private suspend fun upsertList(rl: RemoteList) {
@@ -130,6 +133,18 @@ class CollaborationSyncManager(
         scope.launch {
             val list = listDao.getListOnce(listId) ?: return@launch
             pushListSnapshot(list)
+            // Mark the list as shared LOCALLY right away by inserting the owner's own member row.
+            // Without this, isShared() stays false until the owner-member push round-trips back
+            // through observeMembers, so items added while the invite is still pending would not be
+            // pushed individually. mirrorMembers() guards on getMember(), so this won't duplicate.
+            if (memberDao.getMember(listId, list.ownerId) == null) {
+                memberDao.upsert(
+                    ListMemberEntity(
+                        memberId = Uuid.random().toString(), listId = listId,
+                        userId = list.ownerId, role = ListRole.OWNER
+                    )
+                )
+            }
             val inviterName = userDao.getUserOnce(invite.inviterUserId)?.fullName
             backend.createInvite(
                 RemoteInvite(
