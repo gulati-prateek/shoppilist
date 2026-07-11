@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shoppilist.shared.auth.AuthService
 import com.shoppilist.shared.auth.AuthUser
+import com.shoppilist.shared.deviceRegionCode
 import com.shoppilist.shared.backend.ProfileBackend
 import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.backend.RemoteInvite
@@ -39,16 +40,32 @@ data class AuthUiState(
     /** First-time account (no first name on record yet) — route to profile setup, not Home. */
     val needsProfile: Boolean = false,
     /** Set only once the account is verified (issue 9's gate) — the UI navigates on this. */
-    val verifiedUser: AuthUser? = null
+    val verifiedUser: AuthUser? = null,
+    /** Country whose dialing code prefixes the phone-number field. Defaults to the user's last
+     *  choice, else the device region, else India. */
+    val phoneCountry: Country = CountryLanguageData.defaultCountry
 )
 
 class AuthViewModel(
     private val authService: AuthService,
-    private val accountSync: UserAccountSync
+    private val accountSync: UserAccountSync,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(AuthUiState())
+    private val _state = MutableStateFlow(AuthUiState(phoneCountry = resolveInitialPhoneCountry()))
     val state: StateFlow<AuthUiState> = _state
+
+    /** First use → device region; thereafter → the country the user last picked here. */
+    private fun resolveInitialPhoneCountry(): Country =
+        CountryLanguageData.countryFor(sessionManager.phoneCountryCode)
+            ?: CountryLanguageData.countryFor(deviceRegionCode())
+            ?: CountryLanguageData.defaultCountry
+
+    /** User changed the phone-number country code — apply it and remember it for next time. */
+    fun setPhoneCountry(country: Country) {
+        sessionManager.phoneCountryCode = country.code
+        _state.update { it.copy(phoneCountry = country) }
+    }
 
     /** Name captured at registration time; phone verification completes via async callbacks
      *  that no longer have the form fields in scope. */

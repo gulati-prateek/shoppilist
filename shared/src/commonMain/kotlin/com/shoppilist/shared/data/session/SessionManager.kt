@@ -53,6 +53,12 @@ class SessionManager(private val settings: Settings) {
         get() = settings.getBoolean(KEY_ONBOARDING_DONE, false)
         set(value) { settings.putBoolean(KEY_ONBOARDING_DONE, value) }
 
+    /** ISO country code the user last selected for the phone-number field — remembered across
+     *  sessions so the phone country code defaults to the one they chose at first use. */
+    var phoneCountryCode: String?
+        get() = settings.getStringOrNull(KEY_PHONE_COUNTRY)
+        set(value) { if (value == null) settings.remove(KEY_PHONE_COUNTRY) else settings.putString(KEY_PHONE_COUNTRY, value) }
+
     /** Last device location the user fetched (dashboard chip). Survives logout deliberately —
      *  [clear] leaves it so the value is remembered on relogin. */
     fun setLastLocation(location: StoredLocation) {
@@ -91,6 +97,7 @@ class SessionManager(private val settings: Settings) {
         private const val KEY_PENDING_COUNTRY = "pending_country_code"
         private const val KEY_PENDING_LANGUAGE = "pending_language_code"
         private const val KEY_ONBOARDING_DONE = "onboarding_done"
+        private const val KEY_PHONE_COUNTRY = "phone_country_code"
         private const val KEY_LOC_LAT = "last_location_lat"
         private const val KEY_LOC_LNG = "last_location_lng"
         private const val KEY_LOC_CITY = "last_location_city"

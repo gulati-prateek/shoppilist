@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.auth.rememberAuthUiHost
 import com.shoppilist.shared.data.session.StoredLocation
+import com.shoppilist.shared.domain.Country
 import com.shoppilist.shared.location.rememberLocationController
 import com.shoppilist.shared.presentation.AuthUiState
 import com.shoppilist.shared.presentation.AuthViewModel
@@ -204,6 +205,46 @@ private fun ForgotPasswordDialog(initialEmail: String, onSend: (String) -> Unit,
     )
 }
 
+/**
+ * Phone-number entry with a tappable country-code selector. The code defaults to the country the
+ * user picked at first use (persisted) / their device region, and changing it here remembers the
+ * choice — so "+91" is no longer hard-coded. Filters to digits and caps at the E.164 length.
+ */
+@Composable
+private fun PhoneNumberField(
+    country: Country,
+    onCountryChange: (Country) -> Unit,
+    phone: String,
+    onPhoneChange: (String) -> Unit
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(onClick = { showPicker = true }, contentPadding = PaddingValues(horizontal = 12.dp)) {
+            Text("${country.flag} ${country.dialCode}")
+            Icon(Icons.Default.ArrowDropDown, contentDescription = "Change country code")
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { onPhoneChange(it.filter(Char::isDigit).take(15)) },
+            label = { Text("Phone number") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            singleLine = true,
+            modifier = Modifier.weight(1f)
+        )
+    }
+    if (showPicker) {
+        Dialog(onDismissRequest = { showPicker = false }) {
+            Card {
+                CountryPickerList(
+                    modifier = Modifier.padding(16.dp).heightIn(max = 480.dp),
+                    onSelect = { picked -> onCountryChange(picked); showPicker = false }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel = koinViewModel(),
@@ -292,17 +333,15 @@ fun LoginScreen(
                 }
                 TextButton(onClick = { showForgot = true }) { Text("Forgot password?") }
             } else {
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it.filter(Char::isDigit).take(10) },
-                    label = { Text("Phone number") },
-                    prefix = { Text("+91 ") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
+                PhoneNumberField(
+                    country = state.phoneCountry,
+                    onCountryChange = viewModel::setPhoneCountry,
+                    phone = phone,
+                    onPhoneChange = { phone = it }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 if (!state.otpSent) {
-                    Button(onClick = { viewModel.sendOtp(null, "+91$phone", uiHost) }, enabled = !state.loading) {
+                    Button(onClick = { viewModel.sendOtp(null, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
                         Text("Send OTP")
                     }
                 } else {
@@ -314,7 +353,7 @@ fun LoginScreen(
                     Button(onClick = { viewModel.submitOtp(otp) }, enabled = !state.loading) {
                         Text("Verify & Login")
                     }
-                    TextButton(onClick = { viewModel.sendOtp(null, "+91$phone", uiHost) }, enabled = !state.loading) {
+                    TextButton(onClick = { viewModel.sendOtp(null, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
                         Text("Resend code")
                     }
                 }
@@ -390,17 +429,15 @@ fun RegisterScreen(
                     Text("Register")
                 }
             } else {
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it.filter(Char::isDigit).take(10) },
-                    label = { Text("Phone number") },
-                    prefix = { Text("+91 ") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
+                PhoneNumberField(
+                    country = state.phoneCountry,
+                    onCountryChange = viewModel::setPhoneCountry,
+                    phone = phone,
+                    onPhoneChange = { phone = it }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 if (!state.otpSent) {
-                    Button(onClick = { viewModel.sendOtp(name, "+91$phone", uiHost) }, enabled = !state.loading) {
+                    Button(onClick = { viewModel.sendOtp(name, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
                         Text("Send OTP")
                     }
                 } else {
@@ -412,7 +449,7 @@ fun RegisterScreen(
                     Button(onClick = { viewModel.submitOtp(otp) }, enabled = !state.loading) {
                         Text("Verify & Register")
                     }
-                    TextButton(onClick = { viewModel.sendOtp(name, "+91$phone", uiHost) }, enabled = !state.loading) {
+                    TextButton(onClick = { viewModel.sendOtp(name, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
                         Text("Resend code")
                     }
                 }
