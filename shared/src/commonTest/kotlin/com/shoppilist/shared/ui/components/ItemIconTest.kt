@@ -50,4 +50,23 @@ class ItemIconTest {
         assertEquals("🎮", emojiForItem("Console skin", "gaming"))
         assertEquals(null, emojiForItem("Mystery thing", null))
     }
+
+    @Test
+    fun packaging_silhouettes_match_real_shelf_products() {
+        assertEquals(PackagingType.CARTON, packagingForItem("Milk", "dairy_eggs"))
+        assertEquals(PackagingType.TRAY, packagingForItem("Eggs", "dairy_eggs"))
+        assertEquals(PackagingType.TRAY, packagingForItem("Chicken breast", "meat_seafood"))
+        assertEquals(PackagingType.CAN, packagingForItem("Tuna", "meat_seafood"))
+        assertEquals(PackagingType.POUCH, packagingForItem("Potato chips", "snacks_confectionery"))
+        assertEquals(PackagingType.BOX, packagingForItem("Cornflakes", "canned_packaged"))
+        assertEquals(PackagingType.BOTTLE, packagingForItem("Olive oil", "canned_packaged"))
+        assertEquals(PackagingType.JAR, packagingForItem("Honey", "canned_packaged"))
+        assertEquals(PackagingType.CAN, packagingForItem("Baked beans", "canned_packaged"))
+        assertEquals(PackagingType.TUBE, packagingForItem("Toothpaste", "personal_care"))
+        assertEquals(PackagingType.PUMP, packagingForItem("Shampoo", "personal_care"))
+        assertEquals(PackagingType.BOX, packagingForItem("Sneakers", "footwear"))
+        // Loose fresh produce and clothing stay as plain emoji tiles.
+        assertEquals(PackagingType.NONE, packagingForItem("Spinach", "fresh_produce"))
+        assertEquals(PackagingType.NONE, packagingForItem("Casual shirts", "mens_wear"))
+    }
 }

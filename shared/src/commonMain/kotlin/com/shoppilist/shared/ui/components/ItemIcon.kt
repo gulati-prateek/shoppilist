@@ -1,7 +1,11 @@
 package com.shoppilist.shared.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -10,6 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -168,9 +180,118 @@ fun emojiForItem(name: String, categoryId: String?): String? {
 }
 
 /**
- * A rounded thumbnail showing the item's emoji on a soft surface. Never blank: name-keyword match
- * first, then the category icon ([categoryEmoji] — e.g. the category row's own emoji from the DB —
- * beats the static map so custom categories work too), then a generic shopping-bag fallback.
+ * How the product typically sits on a supermarket shelf — the thumbnail draws this silhouette
+ * behind the item emoji so rows read like mini packshots rather than bare food emojis.
+ * [NONE] keeps the plain emoji tile (loose fresh produce, clothing on hangers…).
+ */
+enum class PackagingType { NONE, CARTON, BOTTLE, PUMP, CAN, JAR, BOX, POUCH, TUBE, TRAY }
+
+/** Default packaging per catalog category (keyword overrides below refine within a category). */
+private val CATEGORY_PACKAGING: Map<String, PackagingType> = mapOf(
+    "fresh_produce" to PackagingType.NONE,
+    "meat_seafood" to PackagingType.TRAY,
+    "dairy_eggs" to PackagingType.CARTON,
+    "bakery_bread" to PackagingType.POUCH,
+    "frozen_foods" to PackagingType.BOX,
+    "canned_packaged" to PackagingType.CAN,
+    "personal_care" to PackagingType.PUMP,
+    "household_cleaning" to PackagingType.PUMP,
+    "beverages" to PackagingType.BOTTLE,
+    "snacks_confectionery" to PackagingType.POUCH,
+    "baby_kids" to PackagingType.BOX,
+    "pet_care" to PackagingType.POUCH,
+    "health_pharmacy" to PackagingType.BOX,
+    "spices_condiments" to PackagingType.JAR,
+    "mobile_accessories" to PackagingType.BOX,
+    "computers_laptops" to PackagingType.BOX,
+    "home_entertainment" to PackagingType.BOX,
+    "home_appliances" to PackagingType.BOX,
+    "gaming" to PackagingType.BOX,
+    "mens_wear" to PackagingType.NONE,
+    "womens_wear" to PackagingType.NONE,
+    "kids_wear" to PackagingType.NONE,
+    "footwear" to PackagingType.BOX,          // shoebox
+    "ethnic_wear" to PackagingType.NONE,
+    "watches_jewelry" to PackagingType.BOX,   // gift box
+    "bags_accessories" to PackagingType.NONE,
+    "perfumes_fragrances" to PackagingType.BOTTLE,
+    "gifts_stationery" to PackagingType.BOX,
+    "kitchenware_cookware" to PackagingType.BOX,
+    "bedding_linen" to PackagingType.NONE,
+    "storage_organization" to PackagingType.BOX
+)
+
+/** Item-level packaging overrides (checked with the same token-prefix rules as the emoji map). */
+private val PACKAGING_OVERRIDES: List<Pair<String, PackagingType>> = listOf(
+    // Dairy & beverages
+    "egg" to PackagingType.TRAY, "cheese" to PackagingType.POUCH, "butter" to PackagingType.BOX,
+    "yogurt" to PackagingType.JAR, "yoghurt" to PackagingType.JAR, "curd" to PackagingType.JAR,
+    "ghee" to PackagingType.JAR, "ice cream" to PackagingType.JAR, "icecream" to PackagingType.JAR,
+    "juice" to PackagingType.CARTON, "milk" to PackagingType.CARTON, "lassi" to PackagingType.CARTON,
+    "beer" to PackagingType.CAN, "wine" to PackagingType.BOTTLE, "water" to PackagingType.BOTTLE,
+    "coffee" to PackagingType.JAR, "tea" to PackagingType.BOX,
+    // Staples & condiments
+    "flour" to PackagingType.POUCH, "rice" to PackagingType.POUCH, "sugar" to PackagingType.POUCH,
+    "salt" to PackagingType.POUCH, "oat" to PackagingType.BOX, "cereal" to PackagingType.BOX,
+    "cornflake" to PackagingType.BOX, "granola" to PackagingType.BOX, "muesli" to PackagingType.BOX,
+    "pasta" to PackagingType.POUCH, "noodle" to PackagingType.POUCH,
+    "oil" to PackagingType.BOTTLE, "ketchup" to PackagingType.BOTTLE, "sauce" to PackagingType.BOTTLE,
+    "vinegar" to PackagingType.BOTTLE, "honey" to PackagingType.JAR, "jam" to PackagingType.JAR,
+    "pickle" to PackagingType.JAR, "syrup" to PackagingType.BOTTLE, "cough syrup" to PackagingType.BOTTLE,
+    // Seafood that ships tinned
+    "tuna" to PackagingType.CAN, "sardine" to PackagingType.CAN,
+    // Bakery exceptions
+    "cake" to PackagingType.BOX, "donut" to PackagingType.BOX, "doughnut" to PackagingType.BOX,
+    "pie" to PackagingType.BOX,
+    // Personal care & household
+    "toothpaste" to PackagingType.TUBE, "paste" to PackagingType.TUBE,
+    "face cream" to PackagingType.TUBE, "shaving cream" to PackagingType.TUBE,
+    "gel" to PackagingType.TUBE, "soap" to PackagingType.BOX, "tissue" to PackagingType.BOX,
+    "toothbrush" to PackagingType.BOX, "razor" to PackagingType.BOX, "lipstick" to PackagingType.TUBE,
+    "perfume" to PackagingType.BOTTLE, "cologne" to PackagingType.BOTTLE,
+    "toilet paper" to PackagingType.POUCH, "diaper" to PackagingType.POUCH, "wipe" to PackagingType.POUCH,
+    "candle" to PackagingType.BOX,
+    // Pharmacy liquids
+    "vitamin" to PackagingType.JAR
+)
+
+private fun keywordHit(keyword: String, lower: String, tokens: List<String>): Boolean =
+    if (' ' in keyword) lower.contains(keyword) else tokens.any { it.startsWith(keyword) }
+
+/** Sorted longest-first like the emoji map, so "cough syrup" beats "syrup" etc. */
+private val SORTED_PACKAGING_OVERRIDES: List<Pair<String, PackagingType>> =
+    PACKAGING_OVERRIDES.sortedByDescending { it.first.length }
+
+fun packagingForItem(name: String, categoryId: String?): PackagingType {
+    val lower = name.lowercase()
+    val tokens = lower.split(TOKEN_SPLIT).filter { it.isNotEmpty() }
+    SORTED_PACKAGING_OVERRIDES.firstOrNull { keywordHit(it.first, lower, tokens) }?.let { return it.second }
+    return categoryId?.let { CATEGORY_PACKAGING[it] } ?: PackagingType.NONE
+}
+
+// Soft shelf-packaging tints; picked per category (stable) so a section looks cohesive.
+private val PACKAGING_TINTS = listOf(
+    Color(0xFFDCE8DD), // sage
+    Color(0xFFF3E5C3), // cream gold
+    Color(0xFFDBE7F0), // powder blue
+    Color(0xFFF3DDDD), // rose
+    Color(0xFFEDE3F1), // lilac
+    Color(0xFFE7EBD9)  // olive
+)
+
+private fun tintFor(seed: String): Color {
+    var h = 0
+    for (c in seed) h = 31 * h + c.code
+    val idx = ((h % PACKAGING_TINTS.size) + PACKAGING_TINTS.size) % PACKAGING_TINTS.size
+    return PACKAGING_TINTS[idx]
+}
+
+/**
+ * A rounded thumbnail showing the item's emoji on its typical supermarket packaging silhouette
+ * (carton/bottle/can/box/pouch… — user feedback: icons should look like real shelf products).
+ * Never blank: name-keyword match first, then the category icon ([categoryEmoji] — e.g. the
+ * category row's own emoji from the DB — beats the static map so custom categories work too),
+ * then a generic shopping-bag fallback.
  */
 @Composable
 fun ItemIcon(
@@ -181,6 +302,9 @@ fun ItemIcon(
     categoryEmoji: String? = null
 ) {
     val emoji = emojiForItem(name, categoryId) ?: categoryEmoji ?: "🛍️"
+    val packaging = packagingForItem(name, categoryId)
+    val body = tintFor(categoryId ?: name)
+    val outline = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
     Box(
         modifier = modifier
             .size(size)
@@ -188,6 +312,127 @@ fun ItemIcon(
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        Text(emoji, fontSize = (size.value * 0.5f).sp)
+        if (packaging != PackagingType.NONE) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
+                drawPackaging(packaging, body, outline)
+            }
+        }
+        // The emoji becomes the product "label", sitting on the silhouette's label area.
+        val (labelCenterY, emojiScale) = when (packaging) {
+            PackagingType.NONE -> 0.50f to 0.50f
+            PackagingType.CARTON -> 0.63f to 0.34f
+            PackagingType.BOTTLE -> 0.66f to 0.32f
+            PackagingType.PUMP -> 0.66f to 0.32f
+            PackagingType.CAN -> 0.55f to 0.34f
+            PackagingType.JAR -> 0.60f to 0.34f
+            PackagingType.BOX -> 0.53f to 0.36f
+            PackagingType.POUCH -> 0.53f to 0.36f
+            PackagingType.TUBE -> 0.55f to 0.30f
+            PackagingType.TRAY -> 0.40f to 0.42f // product sits ON the tray
+        }
+        Text(
+            emoji,
+            fontSize = (size.value * emojiScale).sp,
+            modifier = Modifier.offset(y = ((labelCenterY - 0.5f) * size.value).dp)
+        )
+    }
+}
+
+/** Draws one packaging archetype in normalized 0..1 space scaled to the canvas. */
+private fun DrawScope.drawPackaging(type: PackagingType, body: Color, outline: Color) {
+    val w = size.width
+    val h = size.height
+    fun x(f: Float) = f * w
+    fun y(f: Float) = f * h
+    val accent = lerp(body, Color.Black, 0.22f)
+    val label = Color.White.copy(alpha = 0.85f)
+    val stroke = Stroke(width = w * 0.03f)
+
+    fun labelRect(l: Float, t: Float, r: Float, b: Float) {
+        drawRoundRect(
+            color = label,
+            topLeft = Offset(x(l), y(t)),
+            size = Size(x(r - l), y(b - t)),
+            cornerRadius = CornerRadius(w * 0.08f)
+        )
+    }
+
+    when (type) {
+        PackagingType.CARTON -> {
+            // Gable-top milk/juice carton.
+            val path = Path().apply {
+                moveTo(x(0.22f), y(0.95f)); lineTo(x(0.22f), y(0.32f)); lineTo(x(0.38f), y(0.10f))
+                lineTo(x(0.62f), y(0.10f)); lineTo(x(0.78f), y(0.32f)); lineTo(x(0.78f), y(0.95f)); close()
+            }
+            drawPath(path, body); drawPath(path, outline, style = stroke)
+            drawLine(accent, Offset(x(0.22f), y(0.32f)), Offset(x(0.78f), y(0.32f)), stroke.width)
+            labelRect(0.29f, 0.44f, 0.71f, 0.84f)
+        }
+        PackagingType.BOTTLE -> {
+            drawRoundRect(accent, Offset(x(0.42f), y(0.04f)), Size(x(0.16f), y(0.10f)), CornerRadius(w * 0.04f))
+            val path = Path().apply {
+                moveTo(x(0.44f), y(0.14f)); lineTo(x(0.56f), y(0.14f)); lineTo(x(0.74f), y(0.38f))
+                lineTo(x(0.74f), y(0.90f)); lineTo(x(0.68f), y(0.95f)); lineTo(x(0.32f), y(0.95f))
+                lineTo(x(0.26f), y(0.90f)); lineTo(x(0.26f), y(0.38f)); close()
+            }
+            drawPath(path, body); drawPath(path, outline, style = stroke)
+            labelRect(0.32f, 0.48f, 0.68f, 0.86f)
+        }
+        PackagingType.PUMP -> {
+            // Pump/spray bottle (shampoo, cleaner).
+            drawRoundRect(accent, Offset(x(0.40f), y(0.06f)), Size(x(0.20f), y(0.10f)), CornerRadius(w * 0.03f))
+            drawRect(accent, Offset(x(0.60f), y(0.06f)), Size(x(0.14f), y(0.05f)))
+            drawRect(accent, Offset(x(0.46f), y(0.16f)), Size(x(0.08f), y(0.10f)))
+            drawRoundRect(body, Offset(x(0.28f), y(0.26f)), Size(x(0.44f), y(0.70f)), CornerRadius(w * 0.10f))
+            drawRoundRect(outline, Offset(x(0.28f), y(0.26f)), Size(x(0.44f), y(0.70f)), CornerRadius(w * 0.10f), style = stroke)
+            labelRect(0.34f, 0.46f, 0.66f, 0.86f)
+        }
+        PackagingType.CAN -> {
+            drawRoundRect(body, Offset(x(0.22f), y(0.14f)), Size(x(0.56f), y(0.78f)), CornerRadius(w * 0.07f))
+            drawRoundRect(outline, Offset(x(0.22f), y(0.14f)), Size(x(0.56f), y(0.78f)), CornerRadius(w * 0.07f), style = stroke)
+            drawLine(accent, Offset(x(0.22f), y(0.22f)), Offset(x(0.78f), y(0.22f)), stroke.width)
+            drawLine(accent, Offset(x(0.22f), y(0.84f)), Offset(x(0.78f), y(0.84f)), stroke.width)
+            labelRect(0.28f, 0.32f, 0.72f, 0.78f)
+        }
+        PackagingType.JAR -> {
+            drawRoundRect(accent, Offset(x(0.28f), y(0.08f)), Size(x(0.44f), y(0.14f)), CornerRadius(w * 0.05f))
+            drawRoundRect(body, Offset(x(0.20f), y(0.22f)), Size(x(0.60f), y(0.72f)), CornerRadius(w * 0.16f))
+            drawRoundRect(outline, Offset(x(0.20f), y(0.22f)), Size(x(0.60f), y(0.72f)), CornerRadius(w * 0.16f), style = stroke)
+            labelRect(0.28f, 0.40f, 0.72f, 0.82f)
+        }
+        PackagingType.BOX -> {
+            drawRoundRect(body, Offset(x(0.20f), y(0.10f)), Size(x(0.60f), y(0.84f)), CornerRadius(w * 0.05f))
+            drawRoundRect(outline, Offset(x(0.20f), y(0.10f)), Size(x(0.60f), y(0.84f)), CornerRadius(w * 0.05f), style = stroke)
+            drawLine(accent, Offset(x(0.20f), y(0.20f)), Offset(x(0.80f), y(0.20f)), stroke.width)
+            labelRect(0.27f, 0.28f, 0.73f, 0.80f)
+        }
+        PackagingType.POUCH -> {
+            // Crimped snack pouch.
+            drawRect(accent, Offset(x(0.26f), y(0.08f)), Size(x(0.48f), y(0.07f)))
+            drawRoundRect(body, Offset(x(0.20f), y(0.15f)), Size(x(0.60f), y(0.72f)), CornerRadius(w * 0.12f))
+            drawRoundRect(outline, Offset(x(0.20f), y(0.15f)), Size(x(0.60f), y(0.72f)), CornerRadius(w * 0.12f), style = stroke)
+            drawRect(accent, Offset(x(0.26f), y(0.87f)), Size(x(0.48f), y(0.07f)))
+            labelRect(0.28f, 0.30f, 0.72f, 0.78f)
+        }
+        PackagingType.TUBE -> {
+            drawRoundRect(accent, Offset(x(0.40f), y(0.04f)), Size(x(0.20f), y(0.12f)), CornerRadius(w * 0.04f))
+            val path = Path().apply {
+                moveTo(x(0.38f), y(0.16f)); lineTo(x(0.62f), y(0.16f)); lineTo(x(0.74f), y(0.90f))
+                lineTo(x(0.26f), y(0.90f)); close()
+            }
+            drawPath(path, body); drawPath(path, outline, style = stroke)
+            drawLine(accent, Offset(x(0.28f), y(0.84f)), Offset(x(0.72f), y(0.84f)), stroke.width)
+            labelRect(0.38f, 0.34f, 0.62f, 0.74f)
+        }
+        PackagingType.TRAY -> {
+            // Shallow supermarket tray (meat/eggs); the product emoji sits above it.
+            val path = Path().apply {
+                moveTo(x(0.12f), y(0.60f)); lineTo(x(0.88f), y(0.60f)); lineTo(x(0.80f), y(0.92f))
+                lineTo(x(0.20f), y(0.92f)); close()
+            }
+            drawPath(path, body); drawPath(path, outline, style = stroke)
+            drawLine(accent, Offset(x(0.14f), y(0.67f)), Offset(x(0.86f), y(0.67f)), stroke.width)
+        }
+        PackagingType.NONE -> Unit
     }
 }
