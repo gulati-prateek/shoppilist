@@ -6,6 +6,8 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -99,6 +101,8 @@ class FirebaseAuthService : AuthService {
             Exception("Too many attempts from this device — wait a while and try again", e)
         is FirebaseNetworkException ->
             Exception("No internet connection — check your network and try again", e)
+        is FirebaseAuthUserCollisionException ->
+            Exception("That email is already registered — try logging in instead", e)
         else -> e
     }
 
@@ -226,6 +230,37 @@ class FirebaseAuthService : AuthService {
             Result.failure(
                 if (e is FirebaseAuthUserCollisionException)
                     Exception("That email is already used by another account", e)
+                else friendly(e)
+            )
+        }
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> =
+        try {
+            val user = auth.currentUser ?: throw IllegalStateException("Not signed in")
+            val email = user.email
+                ?: throw IllegalStateException("This account has no email password to change")
+            // Firebase requires a recent login for credential changes; re-authenticating with the
+            // current password satisfies that and doubles as verification the user knows it.
+            user.reauthenticate(EmailAuthProvider.getCredential(email, currentPassword)).await()
+            user.updatePassword(newPassword).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(
+                if (e is FirebaseAuthInvalidCredentialsException)
+                    Exception("Current password is incorrect", e)
+                else friendly(e)
+            )
+        }
+
+    override suspend fun deleteAccount(): Result<Unit> =
+        try {
+            val user = auth.currentUser ?: throw IllegalStateException("Not signed in")
+            user.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(
+                if (e is FirebaseAuthRecentLoginRequiredException)
+                    Exception("For security, log out, sign in again, and then retry deleting your account", e)
                 else friendly(e)
             )
         }

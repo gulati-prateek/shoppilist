@@ -49,5 +49,11 @@ class StubAuthService : AuthService {
     override fun submitLinkOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit) =
         onError(notAvailable)
 
+    override suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> =
+        Result.failure(IllegalStateException(notAvailable))
+
+    override suspend fun deleteAccount(): Result<Unit> =
+        Result.failure(IllegalStateException(notAvailable))
+
     override fun signOut() {}
 }

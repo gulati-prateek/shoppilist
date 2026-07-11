@@ -397,12 +397,20 @@ interface ListMemberDao {
 
     @Query("DELETE FROM list_members WHERE listId = :listId AND userId = :userId")
     suspend fun remove(listId: String, userId: String)
+
+    /** Account deletion: wipe the roster table on this device. */
+    @Query("DELETE FROM list_members")
+    suspend fun deleteAll()
 }
 
 @Dao
 interface ShoppingListDao {
-    @Query("SELECT * FROM shopping_lists WHERE parentListId IS NULL ORDER BY pinned DESC, createdAt DESC")
+    @Query("SELECT * FROM shopping_lists WHERE parentListId IS NULL AND archived = 0 ORDER BY pinned DESC, createdAt DESC")
     fun getAllLists(): Flow<List<ShoppingListEntity>>
+
+    /** Archived top-level lists — the Lists tab's "Archived" section (unarchive/delete). */
+    @Query("SELECT * FROM shopping_lists WHERE parentListId IS NULL AND archived = 1 ORDER BY createdAt DESC")
+    fun getArchivedLists(): Flow<List<ShoppingListEntity>>
 
     @Query("SELECT * FROM shopping_lists WHERE parentListId IS NULL AND archived = 0")
     suspend fun getAllListsOnce(): List<ShoppingListEntity>
@@ -422,6 +430,9 @@ interface ShoppingListDao {
     @Query("UPDATE shopping_lists SET archived = 1 WHERE listId = :id")
     suspend fun archive(id: String)
 
+    @Query("UPDATE shopping_lists SET archived = 0 WHERE listId = :id")
+    suspend fun unarchive(id: String)
+
     @Query("UPDATE shopping_lists SET pinned = :pinned WHERE listId = :id")
     suspend fun setPinned(id: String, pinned: Boolean)
 
@@ -433,6 +444,10 @@ interface ShoppingListDao {
 
     @Query("SELECT listId FROM shopping_lists WHERE parentListId = :parentListId")
     suspend fun getSubListIdsOnce(parentListId: String): List<String>
+
+    /** Account deletion: wipe every list on this device. */
+    @Query("DELETE FROM shopping_lists")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -490,6 +505,10 @@ interface ShoppingItemDao {
 
     @Query("DELETE FROM shopping_items WHERE listId = :listId AND checked = 1")
     suspend fun clearPurchased(listId: String)
+
+    /** Account deletion: wipe all items on this device. */
+    @Query("DELETE FROM shopping_items")
+    suspend fun deleteAll()
 }
 
 @Dao

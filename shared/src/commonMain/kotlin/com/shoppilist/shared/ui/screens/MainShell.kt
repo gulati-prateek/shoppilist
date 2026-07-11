@@ -40,7 +40,6 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
 fun MainShell(
     onCreateList: (String?) -> Unit,
     onOpenList: (String) -> Unit,
-    onOpenVoice: () -> Unit,
     onOpenAdmin: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
@@ -94,18 +93,12 @@ fun MainShell(
                 MainTab.HOME -> HomeScreen(
                     onCreateList = onCreateList,
                     onOpenList = onOpenList,
-                    onOpenVoice = onOpenVoice,
                     onOpenProfile = { tab = MainTab.PROFILE },
                     showFab = false
                 )
                 MainTab.CATEGORIES -> CategoriesScreen(onStartList = { categoryId -> onCreateList(categoryId) })
-                MainTab.LISTS -> HomeScreen(
-                    onCreateList = onCreateList,
-                    onOpenList = onOpenList,
-                    onOpenVoice = onOpenVoice,
-                    onOpenProfile = { tab = MainTab.PROFILE },
-                    showFab = false
-                )
+                // A real list manager (all lists + archived), not a Home duplicate.
+                MainTab.LISTS -> ListsScreen(onOpenList = onOpenList)
                 MainTab.PROFILE -> ProfileScreen(
                     onBack = { tab = MainTab.HOME },
                     onOpenAdmin = onOpenAdmin,

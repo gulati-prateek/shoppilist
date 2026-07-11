@@ -43,6 +43,14 @@ class ArchiveListUseCase(private val repo: ShoppingListRepository) {
     suspend operator fun invoke(listId: String): Result<Unit> = repo.archiveList(listId)
 }
 
+class GetArchivedListsUseCase(private val repo: ShoppingListRepository) {
+    operator fun invoke(): Flow<List<ShoppingListEntity>> = repo.getArchivedLists()
+}
+
+class UnarchiveListUseCase(private val repo: ShoppingListRepository) {
+    suspend operator fun invoke(listId: String): Result<Unit> = repo.unarchiveList(listId)
+}
+
 class TogglePinUseCase(private val repo: ShoppingListRepository) {
     suspend operator fun invoke(listId: String, pinned: Boolean): Result<Unit> = repo.setPinned(listId, pinned)
 }

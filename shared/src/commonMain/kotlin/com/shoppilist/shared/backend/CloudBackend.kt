@@ -71,6 +71,9 @@ interface ProfileBackend {
 
     /** Restores the profile on a fresh install / new device; null when absent or offline. */
     suspend fun fetchProfile(uid: String): RemoteProfile?
+
+    /** Removes the profile mirror doc — part of account deletion (Play data-deletion policy). */
+    suspend fun deleteProfile(uid: String): Result<Unit>
 }
 
 interface AdminBackend {
@@ -157,12 +160,24 @@ interface CollaborationBackend {
 
     // Pushes (offline-queued).
     fun pushList(list: RemoteList)
-    fun deleteList(listId: String)
+
+    /** Deep-deletes the list: its items/members/activity docs AND the list doc itself. Deleting
+     *  only the parent doc would strand the member docs, and the collectionGroup("members")
+     *  membership query would keep resurrecting the list on every device. */
+    suspend fun deleteList(listId: String): Result<Unit>
+
     fun pushItem(listId: String, item: RemoteListItem)
     fun deleteItem(listId: String, itemId: String)
     fun pushMember(listId: String, member: RemoteMember)
+
+    /** Removes a member doc — revokes that user's access + stops the list syncing to them. */
+    fun removeMember(listId: String, userId: String)
+
     fun pushActivity(listId: String, activity: RemoteActivity)
     fun createInvite(invite: RemoteInvite)
+
+    /** Marks an invitation declined so it stops appearing in the invitee's pending feed. */
+    fun declineInvite(inviteId: String)
 
     // Real-time observation.
     /** List ids the given user is a member of. */

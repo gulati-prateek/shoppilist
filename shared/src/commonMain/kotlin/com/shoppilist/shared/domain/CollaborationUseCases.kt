@@ -47,6 +47,10 @@ class AcceptInviteUseCase(private val repo: InvitationRepository) {
     suspend operator fun invoke(token: String, userId: String): Result<Unit> = repo.accept(token, userId)
 }
 
+class DeclineInviteUseCase(private val repo: InvitationRepository) {
+    suspend operator fun invoke(inviteId: String): Result<Unit> = repo.decline(inviteId)
+}
+
 class MarkPresenceUseCase(private val repo: PresenceRepository) {
     suspend operator fun invoke(listId: String, userId: String): Result<Unit> = repo.markActive(listId, userId)
 }

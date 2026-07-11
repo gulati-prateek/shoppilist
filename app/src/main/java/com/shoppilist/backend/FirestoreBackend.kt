@@ -142,6 +142,14 @@ class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend, Collabora
             null
         }
 
+    override suspend fun deleteProfile(uid: String): Result<Unit> =
+        try {
+            db.collection("users").document(uid).delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
     // ---- AdminBackend ----
 
     override suspend fun isAdmin(uid: String): Boolean =
@@ -225,7 +233,24 @@ class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend, Collabora
         )
     }
 
-    override fun deleteList(listId: String) { lists().document(listId).delete() }
+    override suspend fun deleteList(listId: String): Result<Unit> =
+        try {
+            // Deep delete: Firestore doc deletion does NOT cascade to subcollections, and leftover
+            // member docs would keep the list in every member's collectionGroup membership query.
+            val listRef = lists().document(listId)
+            for (sub in listOf("items", "members", "activity")) {
+                val docs = listRef.collection(sub).get().await().documents
+                docs.chunked(400).forEach { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { batch.delete(it.reference) }
+                    batch.commit().await()
+                }
+            }
+            listRef.delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
 
     override fun pushItem(listId: String, item: RemoteListItem) {
         lists().document(listId).collection("items").document(item.id).set(
@@ -247,6 +272,10 @@ class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend, Collabora
             mapOf("userId" to member.userId, "role" to member.role, "name" to member.name, "joinedAt" to member.joinedAt)
                 .filterValues { it != null }, SetOptions.merge()
         )
+    }
+
+    override fun removeMember(listId: String, userId: String) {
+        lists().document(listId).collection("members").document(userId).delete()
     }
 
     override fun pushActivity(listId: String, activity: RemoteActivity) {
@@ -351,6 +380,11 @@ class FirestoreBackend : CatalogBackend, ProfileBackend, AdminBackend, Collabora
                 })
             }
         awaitClose { reg.remove() }
+    }
+
+    override fun declineInvite(inviteId: String) {
+        db.collection("invitations").document(inviteId)
+            .update(mapOf("status" to "DECLINED", "declinedAt" to currentTimeMillis()))
     }
 
     override suspend fun acceptInvite(invite: RemoteInvite, userId: String, userName: String?): Result<Unit> =

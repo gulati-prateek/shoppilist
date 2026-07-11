@@ -18,6 +18,8 @@ interface ShoppingListRepository {
     suspend fun updateList(list: ShoppingListEntity): Result<Unit>
     suspend fun deleteList(listId: String): Result<Unit>
     suspend fun archiveList(listId: String): Result<Unit>
+    fun getArchivedLists(): Flow<List<ShoppingListEntity>>
+    suspend fun unarchiveList(listId: String): Result<Unit>
     suspend fun setPinned(listId: String, pinned: Boolean): Result<Unit>
     suspend fun setParent(listId: String, parentListId: String?): Result<Unit>
 }
@@ -166,6 +168,16 @@ class RoomShoppingListRepository(
             Result.failure(e)
         }
     }
+
+    override fun getArchivedLists(): Flow<List<ShoppingListEntity>> = listDao.getArchivedLists()
+
+    override suspend fun unarchiveList(listId: String): Result<Unit> =
+        try {
+            listDao.unarchive(listId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
 }
 
 class RoomShoppingItemRepository(

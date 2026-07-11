@@ -23,6 +23,8 @@ class StubProfileBackend : ProfileBackend {
     override fun saveProfile(profile: RemoteProfile) = Unit
 
     override suspend fun fetchProfile(uid: String): RemoteProfile? = null
+
+    override suspend fun deleteProfile(uid: String): Result<Unit> = Result.success(Unit)
 }
 
 class StubAdminBackend : AdminBackend {
@@ -48,12 +50,14 @@ class StubCollaborationBackend : CollaborationBackend {
     override val isAvailable: Boolean = false
 
     override fun pushList(list: RemoteList) = Unit
-    override fun deleteList(listId: String) = Unit
+    override suspend fun deleteList(listId: String): Result<Unit> = Result.success(Unit)
     override fun pushItem(listId: String, item: RemoteListItem) = Unit
     override fun deleteItem(listId: String, itemId: String) = Unit
     override fun pushMember(listId: String, member: RemoteMember) = Unit
+    override fun removeMember(listId: String, userId: String) = Unit
     override fun pushActivity(listId: String, activity: RemoteActivity) = Unit
     override fun createInvite(invite: RemoteInvite) = Unit
+    override fun declineInvite(inviteId: String) = Unit
 
     override fun observeMyListIds(uid: String): Flow<List<String>> = flowOf(emptyList())
     override fun observeList(listId: String): Flow<RemoteList?> = flowOf(null)

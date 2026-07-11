@@ -1,11 +1,7 @@
 package com.shoppilist.shared.di
 
 import com.shoppilist.shared.data.repository.*
-import com.shoppilist.shared.data.session.SessionManager
 import com.shoppilist.shared.domain.*
-import com.shoppilist.shared.voice.CommandExecutor
-import com.shoppilist.shared.voice.RuleBasedProcessor
-import com.shoppilist.shared.voice.VoiceIntentProcessor
 import org.koin.dsl.module
 
 val repositoryModule = module {
@@ -25,6 +21,8 @@ val repositoryModule = module {
     factory { CreateListUseCase(get()) }
     factory { DeleteListUseCase(get()) }
     factory { ArchiveListUseCase(get()) }
+    factory { GetArchivedListsUseCase(get()) }
+    factory { UnarchiveListUseCase(get()) }
     factory { TogglePinUseCase(get()) }
     factory { RenameListUseCase(get()) }
     factory { GetListItemsUseCase(get()) }
@@ -40,20 +38,4 @@ val repositoryModule = module {
     factory { UnassignItemUseCase(get()) }
     factory { GetMyItemsUseCase(get()) }
     factory { GetAssignmentSummaryUseCase() }
-
-    // Voice
-    single<VoiceIntentProcessor> { RuleBasedProcessor() }
-    factory {
-        CommandExecutor(
-            get<GetAllListsUseCase>(),
-            get<GetListUseCase>(),
-            get<CreateListUseCase>(),
-            get<AddItemUseCase>(),
-            get<DeleteItemUseCase>(),
-            get<MarkItemCheckedUseCase>(),
-            get<GetListItemsUseCase>(),
-            get<DeleteListUseCase>(),
-            get<SessionManager>().requireUserId()
-        )
-    }
 }

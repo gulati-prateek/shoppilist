@@ -76,5 +76,13 @@ interface AuthService {
     /** Completes phone linking with the SMS code from the latest [startPhoneLink]. */
     fun submitLinkOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit)
 
+    /** Changes the password of an email+password account after re-authenticating with
+     *  [currentPassword] (Firebase requires a recent login for credential changes). */
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit>
+
+    /** Permanently deletes the signed-in auth account (Play account-deletion policy). May fail
+     *  with a "recent login required" style error — surface it and let the user retry. */
+    suspend fun deleteAccount(): Result<Unit>
+
     fun signOut()
 }

@@ -48,24 +48,35 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/lists/$(listId)/members/$(request.auth.uid));
     }
 
-    // Shared lists: a signed-in user may create a list (they set themselves as owner); members of
-    // the list may read/update/delete it and everything under it.
+    // Role-gated writes: VIEWER members can read everything but change nothing (B6).
+    function canEdit(listId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/lists/$(listId)/members/$(request.auth.uid))
+             .data.role in ['OWNER', 'EDITOR'];
+    }
+
+    // Shared lists: a signed-in user may create a list (they set themselves as owner); every
+    // member reads; only OWNER/EDITOR members mutate.
     match /lists/{listId} {
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read, update, delete: if isMember(listId);
+      allow read: if isMember(listId);
+      allow update, delete: if canEdit(listId);
 
       match /items/{itemId} {
-        allow read, write: if isMember(listId);
+        allow read: if isMember(listId);
+        allow write: if canEdit(listId);
       }
       match /activity/{activityId} {
-        allow read, write: if isMember(listId);
+        allow read: if isMember(listId);
+        allow write: if canEdit(listId);
       }
-      // Members: a member reads the roster; a user may add themselves (accepting an invite) or the
-      // list owner may manage members.
+      // Members: a member reads the roster; a user may add themselves (accepting an invite) or an
+      // OWNER/EDITOR may manage members; anyone may delete THEIR OWN member doc (leaving a list).
       match /members/{uid} {
         allow read: if isMember(listId);
-        allow create: if signedIn() && (request.auth.uid == uid || isMember(listId));
-        allow update, delete: if isMember(listId);
+        allow create: if signedIn() && (request.auth.uid == uid || canEdit(listId));
+        allow update: if canEdit(listId);
+        allow delete: if signedIn() && (request.auth.uid == uid || canEdit(listId));
       }
     }
 

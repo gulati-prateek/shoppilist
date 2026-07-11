@@ -10,6 +10,7 @@ import com.shoppilist.shared.backend.RemoteProfile
 import com.shoppilist.shared.data.local.UserDao
 import com.shoppilist.shared.data.local.UserEntity
 import com.shoppilist.shared.data.session.SessionManager
+import com.shoppilist.shared.sync.CollaborationSyncManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -19,7 +20,8 @@ class SettingsViewModel(
     private val sessionManager: SessionManager,
     private val authService: AuthService,
     private val adminBackend: AdminBackend,
-    private val profileBackend: ProfileBackend
+    private val profileBackend: ProfileBackend,
+    private val collaborationSync: CollaborationSyncManager
 ) : ViewModel() {
 
     private val _user = MutableStateFlow<UserEntity?>(null)
@@ -182,9 +184,57 @@ class SettingsViewModel(
 
     fun logout() {
         viewModelScope.launch {
+            // B4: tear down the Firestore listeners BEFORE clearing the session, so nothing keeps
+            // mirroring this account's lists into whoever signs in next on this device.
+            collaborationSync.stop()
             runCatching { authService.signOut() }
             sessionManager.clear()
             _loggedOut.value = true
+        }
+    }
+
+    /** C3: change the password of an email+password account (re-authenticates with the current
+     *  password first). */
+    fun changePassword(currentPassword: String, newPassword: String) {
+        if (newPassword.length < 6) {
+            _accountError.value = "New password must be at least 6 characters"
+            return
+        }
+        viewModelScope.launch {
+            _accountError.value = null
+            authService.changePassword(currentPassword, newPassword)
+                .onSuccess { _accountInfo.value = "Password changed" }
+                .onFailure { _accountError.value = it.message ?: "Couldn't change the password" }
+        }
+    }
+
+    /** C1 (Play account-deletion policy): permanently deletes the account and its data.
+     *
+     * Order matters: the Firestore wipe must run while still authenticated (rules gate the
+     * deletes), so remote data goes first, then the auth account, then this device's local data.
+     * If the auth deletion fails with "recent login required", the user re-logs-in and retries —
+     * the remote wipe is then a no-op and the deletion completes. */
+    private val _deletingAccount = MutableStateFlow(false)
+    val deletingAccount: StateFlow<Boolean> = _deletingAccount
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _accountError.value = null
+            _deletingAccount.value = true
+            val uid = sessionManager.requireUserId()
+            runCatching { collaborationSync.wipeRemoteOnAccountDeletion(uid) }
+            runCatching { profileBackend.deleteProfile(uid) }
+            authService.deleteAccount()
+                .onSuccess {
+                    runCatching { collaborationSync.wipeLocalOnAccountDeletion(uid) }
+                    sessionManager.clear()
+                    _deletingAccount.value = false
+                    _loggedOut.value = true
+                }
+                .onFailure {
+                    _deletingAccount.value = false
+                    _accountError.value = it.message ?: "Couldn't delete the account"
+                }
         }
     }
 

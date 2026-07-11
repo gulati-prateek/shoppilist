@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.PushPin
@@ -80,7 +79,6 @@ fun HomeScreen(
     /** Opens create-list; a non-null categoryId scrolls its catalog to that category. */
     onCreateList: (String?) -> Unit = {},
     onOpenList: (String) -> Unit = {},
-    onOpenVoice: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
     /** When hosted inside the bottom-nav shell, the shell owns the create FAB. */
     showFab: Boolean = true
@@ -165,7 +163,8 @@ fun HomeScreen(
                     items(pendingInvites, key = { "invite-${it.inviteId}" }) { invite ->
                         PendingInviteCard(
                             invite = invite,
-                            onAccept = { viewModel.acceptInvite(invite) }
+                            onAccept = { viewModel.acceptInvite(invite) },
+                            onDecline = { viewModel.declineInvite(invite) }
                         )
                     }
                 }
@@ -188,7 +187,8 @@ fun HomeScreen(
                             onArchive = { viewModel.archiveList(list.listId) },
                             onTogglePin = { viewModel.togglePin(list.listId, !list.pinned) },
                             onRename = { renameTarget = list },
-                            onDelete = { viewModel.deleteList(list.listId) }
+                            onDelete = { viewModel.deleteList(list.listId) },
+                            isOwner = viewModel.isOwner(list)
                         )
                     }
                 }
@@ -201,6 +201,118 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * The Lists tab — no longer a duplicate of Home: every active list plus an "Archived" section
+ * with unarchive/delete, so archiving is no longer a one-way trap (issues B5/B8).
+ */
+@Composable
+fun ListsScreen(
+    viewModel: HomeViewModel = koinViewModel(),
+    onOpenList: (String) -> Unit = {}
+) {
+    val state by viewModel.uiState.collectAsState()
+    val listMeta by viewModel.listMeta.collectAsState()
+    val archived by viewModel.archivedLists.collectAsState()
+    var renameTarget by remember { mutableStateOf<ShoppingListEntity?>(null) }
+
+    renameTarget?.let { target ->
+        RenameListDialog(
+            currentName = target.name,
+            onDismiss = { renameTarget = null },
+            onConfirm = { newName ->
+                viewModel.renameList(target.listId, newName)
+                renameTarget = null
+            }
+        )
+    }
+
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = { TopAppBar(title = { Text("Your Lists") }) }
+    ) { padding ->
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 88.dp),
+            modifier = Modifier.padding(padding).fillMaxSize()
+        ) {
+            if (state.lists.isEmpty() && archived.isEmpty() && !state.loading) {
+                item(key = "empty") { EmptyListsState() }
+            }
+            items(state.lists, key = { it.listId }) { list ->
+                HomeListCard(
+                    list = list,
+                    meta = listMeta[list.listId],
+                    onOpen = { onOpenList(list.listId) },
+                    onArchive = { viewModel.archiveList(list.listId) },
+                    onTogglePin = { viewModel.togglePin(list.listId, !list.pinned) },
+                    onRename = { renameTarget = list },
+                    onDelete = { viewModel.deleteList(list.listId) },
+                    isOwner = viewModel.isOwner(list)
+                )
+            }
+            if (archived.isNotEmpty()) {
+                item(key = "archived-header") {
+                    Text(
+                        "Archived",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
+                    )
+                }
+                items(archived, key = { "arch-${it.listId}" }) { list ->
+                    ArchivedListRow(
+                        list = list,
+                        onOpen = { onOpenList(list.listId) },
+                        onUnarchive = { viewModel.unarchiveList(list.listId) },
+                        onDelete = { viewModel.deleteList(list.listId) },
+                        isOwner = viewModel.isOwner(list)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchivedListRow(
+    list: ShoppingListEntity,
+    onOpen: () -> Unit,
+    onUnarchive: () -> Unit,
+    onDelete: () -> Unit,
+    isOwner: Boolean
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(if (isOwner) "Delete list?" else "Leave list?") },
+            text = {
+                Text(
+                    if (isOwner) "\"${list.name}\" and all its items will be permanently deleted."
+                    else "You'll lose access to \"${list.name}\"; the other members keep it."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) {
+                    Text(if (isOwner) "Delete" else "Leave", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
+    ListItem(
+        headlineContent = { Text(list.name) },
+        supportingContent = { Text("Archived", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onUnarchive) { Text("Unarchive") }
+                IconButton(onClick = { confirmDelete = true }) {
+                    Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        modifier = Modifier.clickable(onClick = onOpen)
+    )
 }
 
 /** Horizontal strip of shopping-domain chips communicating the app spans grocery→electronics. */
@@ -240,7 +352,7 @@ private fun EmptyListsState() {
 }
 
 @Composable
-private fun PendingInviteCard(invite: InvitationEntity, onAccept: () -> Unit) {
+private fun PendingInviteCard(invite: InvitationEntity, onAccept: () -> Unit, onDecline: () -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier
@@ -259,6 +371,7 @@ private fun PendingInviteCard(invite: InvitationEntity, onAccept: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
+            TextButton(onClick = onDecline) { Text("Decline") }
             Button(onClick = onAccept) { Text("Accept") }
         }
     }
@@ -344,20 +457,28 @@ private fun HomeListCard(
     onArchive: () -> Unit,
     onTogglePin: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    /** Owner deletes for everyone; a joined member only LEAVES (the list survives for others). */
+    isOwner: Boolean = true
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete list?") },
-            text = { Text("\"${list.name}\" and all its items will be permanently deleted.") },
+            title = { Text(if (isOwner) "Delete list?" else "Leave list?") },
+            text = {
+                Text(
+                    if (isOwner) "\"${list.name}\" and all its items will be permanently deleted" +
+                        (if ((meta?.memberCount ?: 0) > 1) " for every member." else ".")
+                    else "You'll lose access to \"${list.name}\"; the other members keep it."
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     onDelete()
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(if (isOwner) "Delete" else "Leave", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
@@ -422,7 +543,7 @@ private fun HomeListCard(
                             onClick = { menuOpen = false; onArchive() }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(if (isOwner) "Delete" else "Leave list", color = MaterialTheme.colorScheme.error) },
                             leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
                             onClick = { menuOpen = false; confirmDelete = true }
                         )

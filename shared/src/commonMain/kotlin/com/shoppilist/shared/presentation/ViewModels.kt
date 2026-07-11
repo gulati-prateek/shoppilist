@@ -228,8 +228,11 @@ class HomeViewModel(
     private val getListItemsUseCase: GetListItemsUseCase,
     private val getListMembersUseCase: GetListMembersUseCase,
     private val renameListUseCase: RenameListUseCase,
+    private val getArchivedListsUseCase: GetArchivedListsUseCase,
+    private val unarchiveListUseCase: UnarchiveListUseCase,
     private val getPendingInvitesForContactUseCase: GetPendingInvitesForContactUseCase,
     private val acceptInviteUseCase: AcceptInviteUseCase,
+    private val declineInviteUseCase: DeclineInviteUseCase,
     private val sessionManager: SessionManager,
     private val userDao: UserDao,
     private val profileBackend: ProfileBackend,
@@ -325,20 +328,49 @@ class HomeViewModel(
         }
     }
 
+    /** Archived top-level lists — the Lists tab's "Archived" section. */
+    val archivedLists: StateFlow<List<ShoppingListEntity>> =
+        getArchivedListsUseCase()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun archiveList(listId: String) {
         viewModelScope.launch { archiveListUseCase(listId) }
+    }
+
+    fun unarchiveList(listId: String) {
+        viewModelScope.launch { unarchiveListUseCase(listId) }
     }
 
     fun togglePin(listId: String, pinned: Boolean) {
         viewModelScope.launch { togglePinUseCase(listId, pinned) }
     }
 
+    /** True when the signed-in user owns [list] — drives Delete (owner) vs Leave (member). */
+    fun isOwner(list: ShoppingListEntity): Boolean = list.ownerId == sessionManager.requireUserId()
+
+    /** B1/C5: the owner deletes the list everywhere (remote deep-delete first, so the mirror
+     *  can't resurrect it); a non-owner member instead LEAVES — their member doc is removed
+     *  remotely and the list is dropped locally, but other members keep it. */
     fun deleteList(listId: String) {
-        viewModelScope.launch { deleteListUseCase(listId) }
+        viewModelScope.launch {
+            val uid = sessionManager.requireUserId()
+            val list = _uiState.value.lists.find { it.listId == listId }
+                ?: archivedLists.value.find { it.listId == listId }
+            if (list != null && list.ownerId != uid) {
+                collaborationSync.leaveList(listId, uid)
+            } else {
+                collaborationSync.deleteListRemote(listId)
+            }
+            deleteListUseCase(listId)
+        }
     }
 
     fun renameList(listId: String, newName: String) {
-        viewModelScope.launch { renameListUseCase(listId, newName) }
+        viewModelScope.launch {
+            renameListUseCase(listId, newName)
+                // B2: members must see the new name too.
+                .onSuccess { collaborationSync.pushListMeta(listId) }
+        }
     }
 
     /** Cross-device Firestore invites addressed to me, kept for accept-routing. */
@@ -365,6 +397,17 @@ class HomeViewModel(
             val remote = remoteInvitesById.value[invite.inviteId]
             if (remote != null) collaborationSync.acceptInvite(remote)
             else acceptInviteUseCase(invite.token, sessionManager.requireUserId())
+        }
+    }
+
+    /** C4: dismissing an unwanted invite — marked declined remotely and/or locally so it leaves
+     *  the banner instead of sitting there forever. */
+    fun declineInvite(invite: InvitationEntity) {
+        viewModelScope.launch {
+            if (remoteInvitesById.value.containsKey(invite.inviteId)) {
+                collaborationSync.declineInviteRemote(invite.inviteId)
+            }
+            declineInviteUseCase(invite.inviteId)
         }
     }
 

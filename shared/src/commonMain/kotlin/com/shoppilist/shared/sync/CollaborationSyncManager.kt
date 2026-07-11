@@ -45,17 +45,23 @@ class CollaborationSyncManager(
     private val memberDao: ListMemberDao
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var started = false
+    // Whose lists are currently being mirrored — start() restarts cleanly when the account changes
+    // (logout → login as someone else must not keep streaming the previous user's lists).
+    private var startedForUid: String? = null
+    private var rootJob: Job? = null
     // One mirror Job per shared list, so its snapshot listeners can be torn down when the list is
     // no longer shared with this user. Only ever touched from the single observeMyListIds collector.
     private val mirrorJobs = mutableMapOf<String, Job>()
 
-    /** Begins mirroring the signed-in user's shared lists from Firestore into Room. Idempotent. */
+    /** Begins mirroring the signed-in user's shared lists from Firestore into Room. Idempotent for
+     *  the same account; a different signed-in uid tears the old listeners down and restarts. */
     fun start() {
-        if (started || !backend.isAvailable) return
+        if (!backend.isAvailable) return
         val uid = sessionManager.currentUserId.value ?: return
-        started = true
-        scope.launch {
+        if (startedForUid == uid) return
+        stop()
+        startedForUid = uid
+        rootJob = scope.launch {
             backend.observeMyListIds(uid).collect { listIds ->
                 val current = listIds.toSet()
                 // Start mirroring newly-shared lists.
@@ -64,6 +70,16 @@ class CollaborationSyncManager(
                 (mirrorJobs.keys - current).forEach { id -> mirrorJobs.remove(id)?.cancel() }
             }
         }
+    }
+
+    /** Cancels every Firestore listener. Called on logout/account deletion so nothing keeps
+     *  mirroring the old account's lists into whoever signs in next. */
+    fun stop() {
+        rootJob?.cancel()
+        rootJob = null
+        mirrorJobs.values.forEach { it.cancel() }
+        mirrorJobs.clear()
+        startedForUid = null
     }
 
     /** Launches the three per-list snapshot collectors as children of one Job, so cancelling the
@@ -176,6 +192,61 @@ class CollaborationSyncManager(
 
     fun pushListMeta(list: ShoppingListEntity) {
         if (backend.isAvailable) scope.launch { if (isShared(list.listId)) backend.pushList(list.toRemote()) }
+    }
+
+    /** Pushes a list's current metadata (rename etc.) by id — B2: renames must reach members. */
+    fun pushListMeta(listId: String) {
+        if (backend.isAvailable) scope.launch { listDao.getListOnce(listId)?.let { pushListMeta(it) } }
+    }
+
+    /** B1: the owner deleting a shared list removes it from Firestore for every member (deep —
+     *  the mirror would otherwise resurrect it). Await this BEFORE deleting the local rows, since
+     *  isShared() reads the local member table. */
+    suspend fun deleteListRemote(listId: String) {
+        if (!backend.isAvailable || !isShared(listId)) return
+        mirrorJobs.remove(listId)?.cancel() // stop re-mirroring races while the delete lands
+        backend.deleteList(listId)
+    }
+
+    /** C5: a non-owner member leaving a shared list — removes their own member doc (revoking
+     *  access + sync) but leaves the list intact for everyone else. Await before local cleanup. */
+    suspend fun leaveList(listId: String, userId: String) {
+        if (!backend.isAvailable || !isShared(listId)) return
+        mirrorJobs.remove(listId)?.cancel()
+        backend.removeMember(listId, userId)
+    }
+
+    /** B3: removing a member must revoke their Firestore access, not just edit the local roster. */
+    fun removeMemberRemote(listId: String, userId: String) {
+        if (backend.isAvailable) backend.removeMember(listId, userId)
+    }
+
+    /** C4: declining marks the remote invitation so it leaves the invitee's pending feed. */
+    fun declineInviteRemote(inviteId: String) {
+        if (backend.isAvailable) backend.declineInvite(inviteId)
+    }
+
+    /** Account deletion, remote half: deletes every shared list this user OWNS from Firestore
+     *  (members lose it too — it's the owner's data; lists they merely joined are left alone),
+     *  then stops all listeners. Must run while still authenticated (rules gate the deletes). */
+    suspend fun wipeRemoteOnAccountDeletion(uid: String) {
+        if (backend.isAvailable) {
+            val all = listDao.getAllListsOnce() + listDao.getArchivedLists().first()
+            all.filter { it.ownerId == uid }.forEach { list ->
+                mirrorJobs.remove(list.listId)?.cancel()
+                if (isShared(list.listId)) backend.deleteList(list.listId)
+            }
+        }
+        stop()
+    }
+
+    /** Account deletion, local half: clears this device's shopping data + the user row so the
+     *  next sign-in (possibly a different person) doesn't inherit the deleted account's lists. */
+    suspend fun wipeLocalOnAccountDeletion(uid: String) {
+        itemDao.deleteAll()
+        memberDao.deleteAll()
+        listDao.deleteAll()
+        userDao.delete(uid)
     }
 
     /** Accepts a Firestore invite (adds the user as a member remotely); the pull then brings the

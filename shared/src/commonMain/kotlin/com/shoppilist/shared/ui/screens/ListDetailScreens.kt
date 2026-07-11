@@ -149,6 +149,11 @@ fun ListDetailScreen(
     val categoryById = remember(categories) { categories.associateBy { it.categoryId } }
     val hasChecked = items.any { it.checked }
 
+    // B6: a VIEWER member gets a read-only list — mutation affordances hidden/inert here, and the
+    // Firestore rules enforce the same server-side. No member row (solo local list) = full access.
+    val myRole = remember(members, currentUserId) { members.find { it.userId == currentUserId }?.role }
+    val readOnly = myRole == com.shoppilist.shared.data.local.ListRole.VIEWER
+
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
@@ -183,7 +188,7 @@ fun ListDetailScreen(
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
+                        if (!readOnly) DropdownMenuItem(
                             text = { Text("Rename list") },
                             onClick = { menuExpanded = false; showRenameDialog = true }
                         )
@@ -249,7 +254,17 @@ fun ListDetailScreen(
                 onDoneShopping = { viewModel.doneShopping(listId, list?.name ?: "") }
             )
 
-            AddItemSection(
+            if (readOnly) {
+                Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "👁 View only — you were invited as a viewer, so you can't change this list.",
+                        modifier = Modifier.padding(12.dp, 6.dp),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            if (!readOnly) AddItemSection(
                 itemName = itemName,
                 onNameChange = { itemName = it; viewModel.refreshSuggestions(it) },
                 quantity = quantity,
@@ -279,7 +294,7 @@ fun ListDetailScreen(
             )
 
             // Browse the region catalog to add items without typing each one.
-            OutlinedButton(
+            if (!readOnly) OutlinedButton(
                 onClick = {
                     showCatalogPicker = true
                     viewModel.loadCatalog()
@@ -322,12 +337,16 @@ fun ListDetailScreen(
 
             // Ticking a To-Get item stages it (L3/L8) — it moves to Cart only via the bottom-bar step.
             val onCheck: (ShoppingItemEntity) -> Unit = { item ->
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                stagedForCart = if (item.itemId in stagedForCart) stagedForCart - item.itemId else stagedForCart + item.itemId
+                if (!readOnly) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    stagedForCart = if (item.itemId in stagedForCart) stagedForCart - item.itemId else stagedForCart + item.itemId
+                }
             }
             val onUncheck: (ShoppingItemEntity) -> Unit = { item ->
-                stagedForCart = stagedForCart - item.itemId
-                viewModel.markChecked(item.itemId, false)
+                if (!readOnly) {
+                    stagedForCart = stagedForCart - item.itemId
+                    viewModel.markChecked(item.itemId, false)
+                }
             }
             val onToggleSelect: (String) -> Unit = { id ->
                 selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
@@ -347,8 +366,8 @@ fun ListDetailScreen(
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
                         staged = stagedForCart,
-                        onEdit = { editTargetItem = it },
-                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
+                        onEdit = { if (!readOnly) editTargetItem = it },
+                        onQuantityChange = { id, d -> if (!readOnly) viewModel.changeQuantity(id, d) }
                     )
                     ListViewMode.AISLE -> AisleModeContent(
                         items = items,
@@ -362,8 +381,8 @@ fun ListDetailScreen(
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
                         staged = stagedForCart,
-                        onEdit = { editTargetItem = it },
-                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
+                        onEdit = { if (!readOnly) editTargetItem = it },
+                        onQuantityChange = { id, d -> if (!readOnly) viewModel.changeQuantity(id, d) }
                     )
                     ListViewMode.MY_ITEMS -> AisleModeContent(
                         items = myItems,
@@ -377,13 +396,13 @@ fun ListDetailScreen(
                         onOpenAssignee = { assigneeTargetItem = it },
                         resolveName = { viewModel.resolveUserName(it) },
                         staged = stagedForCart,
-                        onEdit = { editTargetItem = it },
-                        onQuantityChange = { id, d -> viewModel.changeQuantity(id, d) }
+                        onEdit = { if (!readOnly) editTargetItem = it },
+                        onQuantityChange = { id, d -> if (!readOnly) viewModel.changeQuantity(id, d) }
                     )
                 }
             }
 
-            if (hasChecked) {
+            if (hasChecked && !readOnly) {
                 Row(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                     OutlinedButton(onClick = { viewModel.clearPurchased(listId) }) { Text("Clear Purchased") }
                 }

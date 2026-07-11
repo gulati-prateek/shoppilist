@@ -21,6 +21,7 @@ val collaborationModule = module {
     factory { GetInvitesForListUseCase(get()) }
     factory { GetPendingInvitesForContactUseCase(get()) }
     factory { AcceptInviteUseCase(get()) }
+    factory { DeclineInviteUseCase(get()) }
     factory { MarkPresenceUseCase(get()) }
     factory { GetPresenceForListUseCase(get()) }
 

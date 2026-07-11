@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +31,6 @@ import com.shoppilist.shared.presentation.AuthViewModel
 import com.shoppilist.shared.presentation.ProfileViewModel
 import com.shoppilist.shared.presentation.SplashViewModel
 import com.shoppilist.shared.presentation.StartDestination
-import com.shoppilist.shared.voice.rememberVoiceInputController
 
 @Composable
 fun SplashScreen(
@@ -140,7 +138,9 @@ private fun AddEmailDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = email, onValueChange = { email = it },
-                    label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                    label = { Text("Email") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -227,6 +227,152 @@ private fun AddPhoneDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+/** C3: change the password of an email+password account (re-authenticates with the current one). */
+@Composable
+private fun ChangePasswordDialog(
+    info: String?,
+    error: String?,
+    onChange: (current: String, new: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change password") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = current, onValueChange = { current = it },
+                    label = { Text("Current password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = new, onValueChange = { new = it },
+                    label = { Text("New password (min 6 characters)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                if (confirm) {
+                    info?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    error?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { confirm = true; onChange(current, new) },
+                enabled = current.isNotBlank() && new.length >= 6
+            ) { Text("Change") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+/** C1: permanent account deletion (Play account-deletion policy) with a strong warning. */
+@Composable
+private fun DeleteAccountDialog(
+    deleting: Boolean,
+    error: String?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete account?") },
+        text = {
+            Column {
+                Text(
+                    "This permanently deletes your account, your profile, and every shared list you " +
+                        "own (other members lose those lists too). Lists you joined stay with their owners. " +
+                        "This cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (deleting) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    CircularProgressIndicator()
+                }
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !deleting) {
+                Text("Delete forever", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !deleting) { Text("Cancel") } }
+    )
+}
+
+/**
+ * C2: in-app Privacy Policy & Terms. PLACEHOLDER legal copy — replace with counsel-reviewed text
+ * (or link a hosted policy URL) before submitting to the Play Store, which requires one.
+ */
+@Composable
+internal fun LegalDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Privacy Policy & Terms") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Privacy Policy", style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "ShoppiList stores your account details (name, email/phone, address you provide), " +
+                        "your shopping lists, and — when you share a list — the list contents and your " +
+                        "display name with the people you invite. Data is stored on your device and in " +
+                        "Google Firebase (Authentication & Cloud Firestore). We don't sell your data or " +
+                        "show third-party ads. You can delete your account and its data anytime from " +
+                        "Profile → Delete account.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Terms of Service", style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "ShoppiList is provided as-is, without warranty. You're responsible for the content " +
+                        "you add and share. Don't use the app for unlawful content or to spam others with " +
+                        "invitations. We may suspend accounts that abuse the service.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+/** "Resend code" with a 30s cooldown so users don't hammer the SMS quota (and Firebase throttles). */
+@Composable
+private fun ResendCodeButton(enabled: Boolean, onResend: () -> Unit) {
+    var resendKey by remember { mutableStateOf(0) }
+    var secondsLeft by remember { mutableStateOf(30) }
+    LaunchedEffect(resendKey) {
+        secondsLeft = 30
+        while (secondsLeft > 0) {
+            kotlinx.coroutines.delay(1000)
+            secondsLeft--
+        }
+    }
+    TextButton(
+        onClick = { onResend(); resendKey++ },
+        enabled = enabled && secondsLeft == 0
+    ) {
+        Text(if (secondsLeft > 0) "Resend code in ${secondsLeft}s" else "Resend code")
+    }
 }
 
 /** Status/progress feedback shared by the Login and Register forms. */
@@ -440,7 +586,9 @@ fun LoginScreen(
             if (method == 0) {
                 OutlinedTextField(
                     value = email, onValueChange = { email = it },
-                    label = { Text("Email") }, modifier = Modifier.fillMaxWidth()
+                    label = { Text("Email") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -475,9 +623,10 @@ fun LoginScreen(
                     Button(onClick = { viewModel.submitOtp(otp) }, enabled = !state.loading) {
                         Text("Verify & Login")
                     }
-                    TextButton(onClick = { viewModel.sendOtp(null, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
-                        Text("Resend code")
-                    }
+                    ResendCodeButton(
+                        enabled = !state.loading,
+                        onResend = { viewModel.sendOtp(null, state.phoneCountry.dialCode + phone, uiHost) }
+                    )
                 }
             }
         }
@@ -537,7 +686,9 @@ fun RegisterScreen(
             if (method == 0) {
                 OutlinedTextField(
                     value = email, onValueChange = { email = it },
-                    label = { Text("Email") }, modifier = Modifier.fillMaxWidth()
+                    label = { Text("Email") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -571,9 +722,10 @@ fun RegisterScreen(
                     Button(onClick = { viewModel.submitOtp(otp) }, enabled = !state.loading) {
                         Text("Verify & Register")
                     }
-                    TextButton(onClick = { viewModel.sendOtp(name, state.phoneCountry.dialCode + phone, uiHost) }, enabled = !state.loading) {
-                        Text("Resend code")
-                    }
+                    ResendCodeButton(
+                        enabled = !state.loading,
+                        onResend = { viewModel.sendOtp(name, state.phoneCountry.dialCode + phone, uiHost) }
+                    )
                 }
             }
         }
@@ -582,6 +734,16 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onLogin) { Text("Already have an account? Log in") }
+        // C2: consent surface at the point of account creation.
+        var showLegal by remember { mutableStateOf(false) }
+        if (showLegal) LegalDialog(onDismiss = { showLegal = false })
+        TextButton(onClick = { showLegal = true }) {
+            Text(
+                "By continuing you agree to our Terms & Privacy Policy",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -890,112 +1052,6 @@ fun ProfileSetupScreen(
     }
 }
 
-@Composable
-fun VoiceScreen(onBack: () -> Unit, viewModel: com.shoppilist.shared.presentation.VoiceViewModel = koinViewModel()) {
-    val input by viewModel.inputText.collectAsState()
-    val result by viewModel.result.collectAsState()
-
-    var isListening by remember { mutableStateOf(false) }
-    var speechError by remember { mutableStateOf<String?>(null) }
-
-    val voiceInput = rememberVoiceInputController(
-        onResult = { text ->
-            viewModel.updateInput(text)
-            viewModel.processText(text)
-        },
-        onListeningChanged = { isListening = it },
-        onError = { speechError = it }
-    )
-
-    DisposableEffect(Unit) {
-        onDispose { voiceInput.destroy() }
-    }
-
-    fun onMicTapped() {
-        speechError = null
-        voiceInput.startListening()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "Back")
-            }
-            Text("Voice Assistant", style = MaterialTheme.typography.headlineSmall)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        IconButton(onClick = { onMicTapped() }, modifier = Modifier.size(80.dp)) {
-            Icon(
-                Icons.Default.Mic,
-                contentDescription = "Tap to speak",
-                modifier = Modifier.size(80.dp),
-                tint = if (isListening) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-            )
-        }
-
-        if (isListening) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Listening…", style = MaterialTheme.typography.bodyMedium)
-        }
-        if (!voiceInput.isAvailable) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Voice input isn't available on this device — type a command below instead",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        if (speechError != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(speechError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = input,
-            onValueChange = { viewModel.updateInput(it) },
-            label = { Text("Or type a command") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = { viewModel.processText(input) }) { Text("Process") }
-            Button(onClick = { viewModel.updateInput("") }) { Text("Clear") }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        result?.let {
-            Text(it, style = MaterialTheme.typography.bodyLarge)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("Try saying:", style = MaterialTheme.typography.labelLarge)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("• Create list called Weekly Groceries", style = MaterialTheme.typography.bodySmall)
-                Text("• Add milk to Weekly Groceries", style = MaterialTheme.typography.bodySmall)
-                Text("• Add milk  (goes to your latest list)", style = MaterialTheme.typography.bodySmall)
-                Text("• Mark milk as purchased", style = MaterialTheme.typography.bodySmall)
-                Text("• Remove milk from Weekly Groceries", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -1027,6 +1083,10 @@ fun ProfileScreen(
     val uiHost = rememberAuthUiHost()
     var showAddEmail by remember { mutableStateOf(false) }
     var showAddPhone by remember { mutableStateOf(false) }
+    var showChangePassword by remember { mutableStateOf(false) }
+    var showDeleteAccount by remember { mutableStateOf(false) }
+    var showLegal by remember { mutableStateOf(false) }
+    val deletingAccount by viewModel.deletingAccount.collectAsState()
 
     LaunchedEffect(loggedOut) { if (loggedOut) onLoggedOut() }
     LaunchedEffect(profileSaved) { if (profileSaved) viewModel.ackProfileSaved() }
@@ -1053,6 +1113,25 @@ fun ProfileScreen(
             onSubmitCode = { viewModel.submitAddPhoneOtp(it) },
             onDismiss = { showAddPhone = false; viewModel.resetAddPhone() }
         )
+    }
+    if (showChangePassword) {
+        ChangePasswordDialog(
+            info = accountInfo,
+            error = accountError,
+            onChange = { current, new -> viewModel.changePassword(current, new) },
+            onDismiss = { showChangePassword = false }
+        )
+    }
+    if (showDeleteAccount) {
+        DeleteAccountDialog(
+            deleting = deletingAccount,
+            error = accountError,
+            onConfirm = { viewModel.deleteAccount() },
+            onDismiss = { if (!deletingAccount) showDeleteAccount = false }
+        )
+    }
+    if (showLegal) {
+        LegalDialog(onDismiss = { showLegal = false })
     }
 
     Column(
@@ -1193,13 +1272,44 @@ fun ProfileScreen(
             Text(if (profileSaved) "Saved ✓" else "Save changes")
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // Security actions: password change (email accounts) + sign out.
+        if (authUser?.email != null) {
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = { showChangePassword = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Change password")
+            }
+        }
+        Spacer(modifier = Modifier.height(if (authUser?.email != null) 8.dp else 24.dp))
         OutlinedButton(
             onClick = { viewModel.logout() },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Log out")
+        }
+
+        // Danger zone: permanent account deletion (Play account-deletion policy).
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(
+            onClick = { showDeleteAccount = true },
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Delete account")
+        }
+
+        // Legal footer.
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            TextButton(onClick = { showLegal = true }) {
+                Text("Privacy Policy & Terms", style = MaterialTheme.typography.bodySmall)
+            }
         }
         Spacer(modifier = Modifier.height(16.dp))
     }

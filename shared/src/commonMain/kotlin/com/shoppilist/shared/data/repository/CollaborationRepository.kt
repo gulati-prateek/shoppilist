@@ -84,6 +84,8 @@ interface InvitationRepository {
     ): Result<InvitationEntity>
     suspend fun findByToken(token: String): InvitationEntity?
     suspend fun accept(token: String, userId: String): Result<Unit>
+    /** C4: marks a pending invite declined so it leaves the Home banner. */
+    suspend fun decline(inviteId: String): Result<Unit>
 }
 
 class RoomInvitationRepository(
@@ -144,4 +146,12 @@ class RoomInvitationRepository(
             Result.failure(e)
         }
     }
+
+    override suspend fun decline(inviteId: String): Result<Unit> =
+        try {
+            invitationDao.updateStatus(inviteId, "DECLINED")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
 }

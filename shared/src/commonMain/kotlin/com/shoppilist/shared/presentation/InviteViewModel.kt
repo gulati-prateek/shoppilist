@@ -75,6 +75,11 @@ class InviteViewModel(
     }
 
     fun removeMember(listId: String, userId: String) {
-        viewModelScope.launch { removeListMemberUseCase(listId, userId) }
+        viewModelScope.launch {
+            // B3: revoke remotely too — otherwise the removed member's device keeps full
+            // Firestore access and the local roster edit is cosmetic.
+            collaborationSync.removeMemberRemote(listId, userId)
+            removeListMemberUseCase(listId, userId)
+        }
     }
 }

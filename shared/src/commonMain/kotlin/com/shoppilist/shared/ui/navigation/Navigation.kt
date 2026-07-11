@@ -36,7 +36,6 @@ sealed class Screen(val route: String) {
     object ListDetail : Screen("list_detail/{listId}") {
         fun createRoute(listId: String) = "list_detail/$listId"
     }
-    object Voice : Screen("voice")
     object Assignments : Screen("assignments/{listId}") {
         fun createRoute(listId: String) = "assignments/$listId"
     }
@@ -111,7 +110,6 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
             MainShell(
                 onCreateList = { categoryId -> navController.navigate(Screen.CreateList.createRoute(categoryId)) },
                 onOpenList = { listId -> navController.navigate(Screen.ListDetail.createRoute(listId)) },
-                onOpenVoice = { navController.navigate(Screen.Voice.route) },
                 onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) },
                 onLoggedOut = { navController.navigate(Screen.Login.route) { popUpTo(0) } }
             )
@@ -147,9 +145,6 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
                 onInvite = { navController.navigate(Screen.Invite.createRoute(listId)) },
                 onBack = { navController.popBackStack() }
             )
-        }
-        composable(Screen.Voice.route) {
-            VoiceScreen(onBack = { navController.popBackStack() })
         }
         composable(Screen.Assignments.route) { backStackEntry ->
             val listId = backStackEntry.arguments?.read { getStringOrNull("listId") } ?: ""
