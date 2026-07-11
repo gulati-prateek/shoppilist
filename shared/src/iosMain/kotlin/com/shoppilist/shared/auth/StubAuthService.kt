@@ -35,5 +35,19 @@ class StubAuthService : AuthService {
     override fun submitOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit) =
         onError(notAvailable)
 
+    override suspend fun linkEmail(email: String, password: String): Result<AuthUser> =
+        Result.failure(IllegalStateException(notAvailable))
+
+    override fun startPhoneLink(
+        phoneNumber: String,
+        uiHost: Any?,
+        onCodeSent: () -> Unit,
+        onVerified: (AuthUser) -> Unit,
+        onError: (String) -> Unit
+    ) = onError(notAvailable)
+
+    override fun submitLinkOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit) =
+        onError(notAvailable)
+
     override fun signOut() {}
 }

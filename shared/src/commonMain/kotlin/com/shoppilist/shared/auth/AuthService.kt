@@ -59,5 +59,22 @@ interface AuthService {
     /** Completes phone sign-in with the SMS code from the latest [startPhoneVerification]. */
     fun submitOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit)
 
+    /** Adds email+password sign-in to the CURRENT account (Profile → "Add email"). Callers follow
+     *  up with [sendEmailVerification] so the new address gets its verification link. */
+    suspend fun linkEmail(email: String, password: String): Result<AuthUser>
+
+    /** Like [startPhoneVerification], but LINKS the verified number to the current account instead
+     *  of signing in with it (Profile → "Add phone"). Same OTP callback contract. */
+    fun startPhoneLink(
+        phoneNumber: String,
+        uiHost: Any?,
+        onCodeSent: () -> Unit,
+        onVerified: (AuthUser) -> Unit,
+        onError: (String) -> Unit
+    )
+
+    /** Completes phone linking with the SMS code from the latest [startPhoneLink]. */
+    fun submitLinkOtp(code: String, onVerified: (AuthUser) -> Unit, onError: (String) -> Unit)
+
     fun signOut()
 }

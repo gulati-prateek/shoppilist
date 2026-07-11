@@ -18,8 +18,13 @@ data class InviteUiState(
     val members: List<ListMemberEntity> = emptyList(),
     val memberNames: Map<String, String> = emptyMap(),
     val lastInviteLink: String? = null,
+    /** One-shot signal: a just-created invite the UI should hand to the SMS/email composer. */
+    val outgoingInvite: OutgoingInvite? = null,
     val error: String? = null
 )
+
+/** What the platform composer needs to pre-fill the invite message. */
+data class OutgoingInvite(val contact: String, val channel: String, val link: String)
 
 class InviteViewModel(
     private val getListMembersUseCase: GetListMembersUseCase,
@@ -49,11 +54,22 @@ class InviteViewModel(
             result.onSuccess { invite ->
                 // Phase 4: push the list + the invite to Firestore so the recipient's device sees it.
                 collaborationSync.shareAndInvite(invite)
-                _uiState.value = _uiState.value.copy(lastInviteLink = "shoppilist.app/join/${invite.token}", error = null)
+                val link = "shoppilist.app/join/${invite.token}"
+                _uiState.value = _uiState.value.copy(
+                    lastInviteLink = link,
+                    // Hand off to the platform SMS/email composer (consumed by the screen).
+                    outgoingInvite = OutgoingInvite(contact = contact.trim(), channel = channel, link = link),
+                    error = null
+                )
             }.onFailure {
                 _uiState.value = _uiState.value.copy(error = it.message)
             }
         }
+    }
+
+    /** The screen handled (or failed to handle) the composer hand-off — clear the one-shot. */
+    fun consumeOutgoingInvite() {
+        _uiState.value = _uiState.value.copy(outgoingInvite = null)
     }
 
     fun removeMember(listId: String, userId: String) {

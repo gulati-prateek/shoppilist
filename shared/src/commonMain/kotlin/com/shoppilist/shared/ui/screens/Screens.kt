@@ -40,21 +40,26 @@ fun SplashScreen(
     onResolved: (StartDestination) -> Unit
 ) {
     LaunchedEffect(Unit) {
-        // Session restore + the verified gate run behind the brand splash; the short delay
-        // keeps the splash from flashing when the check returns instantly (e.g. no session).
-        val destination = viewModel.resolveStartDestination()
-        kotlinx.coroutines.delay(800)
-        onResolved(destination)
+        // Resolve immediately — no artificial hold — so the app opens straight onto the login
+        // form (or Home when a session is restored). The splash shares the auth backdrop, so the
+        // brief moment it's visible reads as the login page loading, not a separate screen.
+        onResolved(viewModel.resolveStartDestination())
     }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("ShoppiList", style = MaterialTheme.typography.displaySmall)
-            Text("Shop anything, together — groceries, fashion, electronics & more.", style = MaterialTheme.typography.bodyMedium)
+    com.shoppilist.shared.ui.components.AuthBackground {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "ShoppiList",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text("Shop anything, together — groceries, fashion, electronics & more.", style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
@@ -85,9 +90,15 @@ private fun ProfileInfoRow(label: String, value: String) {
     }
 }
 
-/** One contact method (email/phone) with its verification badge (issue 8). */
+/** One contact method (email/phone) with its verification badge (issue 8) and an optional
+ *  trailing action ("Add" when missing, "Verify" when unverified). */
 @Composable
-private fun AccountContactRow(label: String, value: String?, verified: Boolean) {
+private fun AccountContactRow(
+    label: String,
+    value: String?,
+    verified: Boolean,
+    action: (@Composable () -> Unit)? = null
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,7 +115,119 @@ private fun AccountContactRow(label: String, value: String?, verified: Boolean) 
                 color = if (verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             )
         }
+        action?.invoke()
     }
+}
+
+/** Profile → "Add email": links email+password sign-in to the account, then a verification link
+ *  is emailed (the account row keeps showing "Not verified" until it's clicked). */
+@Composable
+private fun AddEmailDialog(
+    error: String?,
+    onAdd: (email: String, password: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add email") },
+        text = {
+            Column {
+                Text(
+                    "This adds email & password sign-in to your account. We'll send a verification link.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = email, onValueChange = { email = it },
+                    label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password, onValueChange = { password = it },
+                    label = { Text("New password (min 6 characters)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onAdd(email, password) },
+                enabled = email.contains("@") && password.length >= 6
+            ) { Text("Add & send link") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+/** Profile → "Add phone": OTP-verifies a number and links it to the signed-in account. */
+@Composable
+private fun AddPhoneDialog(
+    defaultCountry: Country,
+    otpSent: Boolean,
+    error: String?,
+    onSendCode: (fullNumber: String) -> Unit,
+    onSubmitCode: (code: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var country by remember { mutableStateOf(defaultCountry) }
+    var phone by remember { mutableStateOf("") }
+    var otp by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add phone number") },
+        text = {
+            Column {
+                if (!otpSent) {
+                    Text(
+                        "We'll text a 6-digit code to verify this number.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PhoneNumberField(
+                        country = country,
+                        onCountryChange = { country = it },
+                        phone = phone,
+                        onPhoneChange = { phone = it }
+                    )
+                } else {
+                    Text(
+                        "Enter the code sent to ${country.dialCode} $phone",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = otp,
+                        onValueChange = { otp = it.filter(Char::isDigit).take(6) },
+                        label = { Text("6-digit code") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            if (!otpSent) {
+                TextButton(
+                    onClick = { onSendCode(country.dialCode + phone) },
+                    enabled = phone.length >= 6
+                ) { Text("Send code") }
+            } else {
+                TextButton(onClick = { onSubmitCode(otp) }, enabled = otp.length == 6) { Text("Verify") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 /** Status/progress feedback shared by the Login and Register forms. */
@@ -278,6 +401,7 @@ fun LoginScreen(
         )
     }
 
+    com.shoppilist.shared.ui.components.AuthBackground {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -365,6 +489,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onCreateAccount) { Text("New here? Create an account") }
     }
+    }
 }
 
 @Composable
@@ -385,6 +510,7 @@ fun RegisterScreen(
 
     LaunchedEffect(state.verifiedUser) { if (state.verifiedUser != null) onRegisterSuccess(state.needsProfile) }
 
+    com.shoppilist.shared.ui.components.AuthBackground {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -460,6 +586,7 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(onClick = onLogin) { Text("Already have an account? Log in") }
+    }
     }
 }
 
@@ -898,8 +1025,40 @@ fun ProfileScreen(
     var editAddress by remember(user?.userId) { mutableStateOf(user?.address.orEmpty()) }
     var pincodeError by remember { mutableStateOf(false) }
 
+    // Add-missing-contact flows (email/phone with verification).
+    val accountInfo by viewModel.accountInfo.collectAsState()
+    val accountError by viewModel.accountError.collectAsState()
+    val addPhoneOtpSent by viewModel.addPhoneOtpSent.collectAsState()
+    val uiHost = rememberAuthUiHost()
+    var showAddEmail by remember { mutableStateOf(false) }
+    var showAddPhone by remember { mutableStateOf(false) }
+
     LaunchedEffect(loggedOut) { if (loggedOut) onLoggedOut() }
     LaunchedEffect(profileSaved) { if (profileSaved) viewModel.ackProfileSaved() }
+    // Auto-close the add dialogs once the account actually carries the new contact.
+    LaunchedEffect(authUser?.email) { if (authUser?.email != null) showAddEmail = false }
+    LaunchedEffect(authUser?.phoneNumber) {
+        if (!authUser?.phoneNumber.isNullOrBlank()) showAddPhone = false
+    }
+
+    if (showAddEmail) {
+        AddEmailDialog(
+            error = accountError,
+            onAdd = { email, password -> viewModel.addEmail(email, password) },
+            onDismiss = { showAddEmail = false }
+        )
+    }
+    if (showAddPhone) {
+        AddPhoneDialog(
+            defaultCountry = com.shoppilist.shared.domain.CountryLanguageData.countryFor(user?.countryCode)
+                ?: com.shoppilist.shared.domain.CountryLanguageData.defaultCountry,
+            otpSent = addPhoneOtpSent,
+            error = accountError,
+            onSendCode = { fullNumber -> viewModel.startAddPhone(fullNumber, uiHost) },
+            onSubmitCode = { viewModel.submitAddPhoneOtp(it) },
+            onDismiss = { showAddPhone = false; viewModel.resetAddPhone() }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -934,7 +1093,7 @@ fun ProfileScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Account & verification status (issue 8)
+        // Account & verification status (issue 8) + add-missing-contact flows.
         Text("Account", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -947,13 +1106,41 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    AccountContactRow(label = "Email", value = account.email, verified = account.emailVerified)
+                    AccountContactRow(
+                        label = "Email",
+                        value = account.email,
+                        verified = account.emailVerified,
+                        action = {
+                            if (account.email == null) {
+                                TextButton(onClick = { showAddEmail = true }) { Text("Add") }
+                            } else if (!account.emailVerified) {
+                                TextButton(onClick = { viewModel.sendEmailVerification() }) { Text("Verify") }
+                            }
+                        }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     AccountContactRow(
                         label = "Phone",
                         value = account.phoneNumber,
-                        verified = !account.phoneNumber.isNullOrBlank()
+                        verified = !account.phoneNumber.isNullOrBlank(),
+                        action = {
+                            if (account.phoneNumber.isNullOrBlank()) {
+                                TextButton(onClick = { showAddPhone = true }) { Text("Add") }
+                            }
+                        }
                     )
+                    accountInfo?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    accountError?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    // Re-check after clicking the emailed verification link.
+                    if (account.email != null && !account.emailVerified) {
+                        TextButton(onClick = { viewModel.refreshAccountStatus() }) { Text("I've verified — refresh") }
+                    }
                 }
             }
         }

@@ -655,7 +655,9 @@ private fun CatalogPickerSheet(
                                 name = name,
                                 added = name.trim().lowercase() in addedThisSession,
                                 alreadyInList = name.trim().lowercase() in existingNames,
-                                onAdd = { addName(name) }
+                                onAdd = { addName(name) },
+                                categoryId = section.category.categoryId,
+                                categoryEmoji = section.category.emoji
                             )
                         }
                     }
@@ -692,7 +694,9 @@ private fun CatalogPickerRow(
     name: String,
     added: Boolean,
     alreadyInList: Boolean,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    categoryId: String? = null,
+    categoryEmoji: String? = null
 ) {
     val done = added || alreadyInList
     ListItem(
@@ -700,7 +704,9 @@ private fun CatalogPickerRow(
             Text(name.replaceFirstChar { it.uppercase() })
         },
         leadingContent = {
-            com.shoppilist.shared.ui.components.ItemIcon(name = name, categoryId = null, size = 36.dp)
+            com.shoppilist.shared.ui.components.ItemIcon(
+                name = name, categoryId = categoryId, size = 36.dp, categoryEmoji = categoryEmoji
+            )
         },
         trailingContent = {
             if (done) {

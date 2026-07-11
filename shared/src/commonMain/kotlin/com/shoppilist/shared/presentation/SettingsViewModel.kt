@@ -41,6 +41,85 @@ class SettingsViewModel(
         }
     }
 
+    // --- Profile "Add email / Add phone" + verification (account card actions) ---
+
+    private val _accountInfo = MutableStateFlow<String?>(null)
+    val accountInfo: StateFlow<String?> = _accountInfo
+
+    private val _accountError = MutableStateFlow<String?>(null)
+    val accountError: StateFlow<String?> = _accountError
+
+    /** True once the add-phone SMS was sent — the dialog switches to its OTP entry step. */
+    private val _addPhoneOtpSent = MutableStateFlow(false)
+    val addPhoneOtpSent: StateFlow<Boolean> = _addPhoneOtpSent
+
+    /** Adds email+password sign-in to the account, then sends the verification link. */
+    fun addEmail(email: String, password: String) {
+        val trimmed = email.trim()
+        if (!trimmed.contains("@")) { _accountError.value = "Enter a valid email address"; return }
+        if (password.length < 6) { _accountError.value = "Password must be at least 6 characters"; return }
+        viewModelScope.launch {
+            _accountError.value = null
+            authService.linkEmail(trimmed, password)
+                .onSuccess { linked ->
+                    val sent = authService.sendEmailVerification()
+                    _authUser.value = linked
+                    updateUser { it.copy(email = trimmed) }
+                    _accountInfo.value =
+                        if (sent.isSuccess) "Verification link sent to $trimmed — tap it, then Refresh"
+                        else "Email added, but the verification link couldn't be sent — tap Verify to retry"
+                }
+                .onFailure { _accountError.value = it.message ?: "Couldn't add the email" }
+        }
+    }
+
+    /** Re-sends the verification link for an existing-but-unverified email. */
+    fun sendEmailVerification() {
+        viewModelScope.launch {
+            _accountError.value = null
+            authService.sendEmailVerification()
+                .onSuccess { _accountInfo.value = "Verification link sent — tap it, then Refresh" }
+                .onFailure { _accountError.value = it.message ?: "Couldn't send the link" }
+        }
+    }
+
+    /** Re-reads the account from the server (e.g. after the user clicked the email link). */
+    fun refreshAccountStatus() {
+        viewModelScope.launch {
+            _authUser.value = authService.currentUser(refresh = true)
+            _accountInfo.value = null
+        }
+    }
+
+    /** Starts the OTP flow that links [phoneNumber] to the signed-in account. */
+    fun startAddPhone(phoneNumber: String, uiHost: Any?) {
+        _accountError.value = null
+        authService.startPhoneLink(
+            phoneNumber = phoneNumber,
+            uiHost = uiHost,
+            onCodeSent = { _addPhoneOtpSent.value = true },
+            onVerified = ::onPhoneLinked,
+            onError = { _accountError.value = it }
+        )
+    }
+
+    fun submitAddPhoneOtp(code: String) {
+        authService.submitLinkOtp(code, onVerified = ::onPhoneLinked, onError = { _accountError.value = it })
+    }
+
+    private fun onPhoneLinked(linked: AuthUser) {
+        _authUser.value = linked
+        _addPhoneOtpSent.value = false
+        linked.phoneNumber?.let { phone -> updateUser { it.copy(phone = phone) } }
+        _accountInfo.value = "Phone number added and verified"
+    }
+
+    /** Dialog dismissed — clear the in-flight add-phone state so a reopen starts fresh. */
+    fun resetAddPhone() {
+        _addPhoneOtpSent.value = false
+        _accountError.value = null
+    }
+
     fun setHideSponsoredLinks(hide: Boolean) = updateUser { it.copy(hideSponsoredLinks = hide) }
 
     fun setGroceryCardDismissed(dismissed: Boolean) = updateUser { it.copy(groceryCardDismissed = dismissed) }

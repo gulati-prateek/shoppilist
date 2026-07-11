@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.resources.*
 import com.shoppilist.shared.data.local.ListRole
+import com.shoppilist.shared.messaging.rememberMessageComposer
 import com.shoppilist.shared.presentation.InviteViewModel
 
 @Composable
@@ -36,11 +37,29 @@ fun InviteScreen(
     LaunchedEffect(listId) { viewModel.loadMembers(listId) }
     val state by viewModel.uiState.collectAsState()
     val clipboard = LocalClipboardManager.current
+    val composer = rememberMessageComposer()
 
     var contact by remember { mutableStateOf("") }
     var channel by remember { mutableStateOf("email") }
     var roleExpanded by remember { mutableStateOf(false) }
     var role by remember { mutableStateOf(ListRole.EDITOR) }
+    var composeFailedChannel by remember { mutableStateOf<String?>(null) }
+
+    // A created invite hands off to the user's SMS/email app so it's actually sent, not just
+    // generated. One-shot: consumed immediately so recompositions don't re-open the composer.
+    LaunchedEffect(state.outgoingInvite) {
+        state.outgoingInvite?.let { out ->
+            val body = "Join my shopping list on ShoppiList! Install the app and sign in as " +
+                "${out.contact} to accept, or use this link: https://${out.link}"
+            val opened = if (out.channel == "email") {
+                composer.composeEmail(out.contact, "You're invited to a ShoppiList list", body)
+            } else {
+                composer.composeSms(out.contact, body)
+            }
+            composeFailedChannel = if (opened) null else out.channel
+            viewModel.consumeOutgoingInvite()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -96,6 +115,15 @@ fun InviteScreen(
                 Text(stringResource(Res.string.action_send_invite))
             }
 
+            composeFailedChannel?.let { failed ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (failed == "email") "Couldn't open an email app — copy the link below and share it yourself."
+                    else "Couldn't open an SMS app — copy the link below and share it yourself.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             state.lastInviteLink?.let { link ->
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

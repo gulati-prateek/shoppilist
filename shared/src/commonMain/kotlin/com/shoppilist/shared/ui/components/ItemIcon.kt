@@ -57,7 +57,7 @@ private val ITEM_KEYWORD_EMOJI: List<Pair<String, String>> = listOf(
 
 /**
  * Best-effort emoji for an item — a specific name-keyword match first, then the item's category
- * icon. Returns null when neither matches (L11: rather show a blank thumbnail than a misleading one).
+ * icon. Returns null when neither matches so callers can supply their own fallback.
  */
 fun emojiForItem(name: String, categoryId: String?): String? {
     val lower = name.lowercase()
@@ -65,10 +65,20 @@ fun emojiForItem(name: String, categoryId: String?): String? {
     return categoryId?.let { CATEGORY_EMOJI[it] }
 }
 
-/** A rounded thumbnail showing the item's emoji on a soft surface; blank when no good match (L11). */
+/**
+ * A rounded thumbnail showing the item's emoji on a soft surface. Never blank: name-keyword match
+ * first, then the category icon ([categoryEmoji] — e.g. the category row's own emoji from the DB —
+ * beats the static map so custom categories work too), then a generic shopping-bag fallback.
+ */
 @Composable
-fun ItemIcon(name: String, categoryId: String?, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    val emoji = emojiForItem(name, categoryId)
+fun ItemIcon(
+    name: String,
+    categoryId: String?,
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp,
+    categoryEmoji: String? = null
+) {
+    val emoji = emojiForItem(name, categoryId) ?: categoryEmoji ?: "🛍️"
     Box(
         modifier = modifier
             .size(size)
@@ -76,6 +86,6 @@ fun ItemIcon(name: String, categoryId: String?, modifier: Modifier = Modifier, s
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (emoji != null) Text(emoji, fontSize = (size.value * 0.5f).sp)
+        Text(emoji, fontSize = (size.value * 0.5f).sp)
     }
 }

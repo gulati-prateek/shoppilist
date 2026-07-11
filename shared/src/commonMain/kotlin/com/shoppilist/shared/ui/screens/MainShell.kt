@@ -90,7 +90,7 @@ fun MainShell(
         Box(modifier = Modifier.padding(padding)) {
             when (tab) {
                 MainTab.HOME -> HomeScreen(
-                    onCreateList = { onCreateList(null) },
+                    onCreateList = onCreateList,
                     onOpenList = onOpenList,
                     onOpenVoice = onOpenVoice,
                     onOpenProfile = { tab = MainTab.PROFILE },
@@ -98,7 +98,7 @@ fun MainShell(
                 )
                 MainTab.CATEGORIES -> CategoriesScreen(onStartList = { categoryId -> onCreateList(categoryId) })
                 MainTab.LISTS -> HomeScreen(
-                    onCreateList = { onCreateList(null) },
+                    onCreateList = onCreateList,
                     onOpenList = onOpenList,
                     onOpenVoice = onOpenVoice,
                     onOpenProfile = { tab = MainTab.PROFILE },

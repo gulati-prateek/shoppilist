@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import com.shoppilist.shared.data.local.InvitationEntity
 import com.shoppilist.shared.data.local.ShoppingListEntity
+import com.shoppilist.shared.data.local.seed.CategoryIds
 import com.shoppilist.shared.location.rememberLocationController
 import com.shoppilist.shared.presentation.CreateListStep
 import com.shoppilist.shared.presentation.CreateListViewModel
@@ -44,13 +46,15 @@ import com.shoppilist.shared.ui.components.ProfileAvatar
 
 /** The five top-level shopping domains the catalog spans — surfaced on the dashboard to signal the
  *  app isn't grocery-only. Each maps to the category ids a quick-start list would emphasize. */
-private data class ShopDomain(val emoji: String, val label: String)
+private data class ShopDomain(val emoji: String, val label: String, val categoryId: String)
 private val SHOP_DOMAINS = listOf(
-    ShopDomain("🛒", "Grocery"),
-    ShopDomain("👗", "Fashion"),
-    ShopDomain("📱", "Electronics"),
-    ShopDomain("🏠", "Home"),
-    ShopDomain("🎁", "Gifts")
+    // categoryId = the first catalog category of that domain, so tapping the chip opens the
+    // create-list catalog scrolled to where the domain's sections begin.
+    ShopDomain("🛒", "Grocery", CategoryIds.FRESH_PRODUCE),
+    ShopDomain("👗", "Fashion", CategoryIds.MENS_WEAR),
+    ShopDomain("📱", "Electronics", CategoryIds.MOBILE_ACCESSORIES),
+    ShopDomain("🏠", "Home", CategoryIds.HOME_APPLIANCES),
+    ShopDomain("🎁", "Gifts", CategoryIds.GIFTS_STATIONERY)
 )
 
 private val PRESET_LIST_COLORS = listOf("#2ECC71", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280")
@@ -73,7 +77,8 @@ private fun colorFromHex(hex: String?): Color? {
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel(),
-    onCreateList: () -> Unit = {},
+    /** Opens create-list; a non-null categoryId scrolls its catalog to that category. */
+    onCreateList: (String?) -> Unit = {},
     onOpenList: (String) -> Unit = {},
     onOpenVoice: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
@@ -116,7 +121,7 @@ fun HomeScreen(
         floatingActionButton = {
             if (showFab) {
                 ExtendedFloatingActionButton(
-                    onClick = onCreateList,
+                    onClick = { onCreateList(null) },
                     icon = { Icon(Icons.Default.Add, null) },
                     text = { Text("New list") }
                 )
@@ -145,7 +150,8 @@ fun HomeScreen(
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp)
                     )
                 }
-                item(key = "domains") { ShopDomainStrip(onPick = { onCreateList() }) }
+                // Tapping a domain opens create-list scrolled to that domain's first category.
+                item(key = "domains") { ShopDomainStrip(onPick = { onCreateList(it.categoryId) }) }
 
                 if (pendingInvites.isNotEmpty()) {
                     item(key = "invites-header") {
@@ -397,9 +403,16 @@ private fun HomeListCard(
                         Icon(Icons.Default.MoreVert, "More")
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        // "Edit list" opens the list itself (same as tapping the card); renaming
+                        // is its own explicit action.
                         DropdownMenuItem(
                             text = { Text("Edit list") },
                             leadingIcon = { Icon(Icons.Default.Edit, null) },
+                            onClick = { menuOpen = false; onOpen() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Rename list") },
+                            leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, null) },
                             onClick = { menuOpen = false; onRename() }
                         )
                         DropdownMenuItem(
