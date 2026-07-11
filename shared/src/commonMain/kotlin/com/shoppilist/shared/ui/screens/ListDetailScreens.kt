@@ -1035,7 +1035,7 @@ private fun GroupedListModeContent(
             }
             if (isExpanded) {
                 items(group.items, key = { it.itemId }) { itemEntity ->
-                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
+                    ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, staged, onEdit, onQuantityChange)
                 }
             }
         }
@@ -1071,7 +1071,7 @@ private fun AisleModeContent(
                 }
             }
             items(group.items, key = { it.itemId }) { itemEntity ->
-                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, itemEntity.categoryId?.let { categoryById[it]?.name }, staged, onEdit, onQuantityChange)
+                ItemRow(itemEntity, selectMode, itemEntity.itemId in selectedIds, onToggleSelect, onCheck, onUncheck, onOpenItem, onOpenAssignee, resolveName, staged, onEdit, onQuantityChange)
             }
         }
     }
@@ -1139,7 +1139,6 @@ private fun ItemRow(
     onOpenItem: (String) -> Unit,
     onOpenAssignee: (ShoppingItemEntity) -> Unit,
     resolveName: suspend (String) -> String? = { null },
-    categoryLabel: String? = null,
     staged: Set<String> = emptySet(),
     onEdit: (ShoppingItemEntity) -> Unit = {},
     onQuantityChange: (String, Double) -> Unit = { _, _ -> }
@@ -1159,27 +1158,12 @@ private fun ItemRow(
             )
         },
         supportingContent = {
+            // Row cleanup (user feedback): no category tag chip (the section header already says
+            // the category) and no inline "+ Assign" — assigning lives in the edit (✎) dialog.
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val qtyLine = "${formatQty(item.quantity)} ${item.unit ?: ""}".trim()
-                    if (qtyLine.isNotBlank()) {
-                        Text(qtyLine, style = MaterialTheme.typography.bodySmall)
-                        if (categoryLabel != null) Spacer(Modifier.width(8.dp))
-                    }
-                    if (categoryLabel != null) {
-                        // Mockup: a soft category tag (e.g. "Groceries") beside the quantity.
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                categoryLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
+                val qtyLine = "${formatQty(item.quantity)} ${item.unit ?: ""}".trim()
+                if (qtyLine.isNotBlank()) {
+                    Text(qtyLine, style = MaterialTheme.typography.bodySmall)
                 }
                 val notes = item.notes
                 if (!notes.isNullOrBlank()) Text(notes, style = MaterialTheme.typography.bodySmall)
@@ -1201,11 +1185,12 @@ private fun ItemRow(
                             modifier = Modifier.clickable { onUncheck(item) }
                         )
                     }
-                } else {
+                } else if (item.assignedTo != null) {
+                    // Passive state only — tap opens the assignee picker to view/change.
                     Text(
-                        text = if (item.assignedTo != null) "Assigned" else "+ Assign",
+                        "👤 Assigned",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (item.assignedTo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable { onOpenAssignee(item) }
                     )
                 }
