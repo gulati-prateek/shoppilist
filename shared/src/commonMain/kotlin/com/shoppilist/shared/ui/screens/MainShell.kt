@@ -37,7 +37,7 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
  */
 @Composable
 fun MainShell(
-    onCreateList: () -> Unit,
+    onCreateList: (String?) -> Unit,
     onOpenList: (String) -> Unit,
     onOpenVoice: () -> Unit,
     onOpenAdmin: () -> Unit,
@@ -78,7 +78,7 @@ fun MainShell(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onCreateList,
+                onClick = { onCreateList(null) },
                 containerColor = MaterialTheme.colorScheme.tertiary,   // gold
                 contentColor = MaterialTheme.colorScheme.onTertiary
             ) {
@@ -90,15 +90,15 @@ fun MainShell(
         Box(modifier = Modifier.padding(padding)) {
             when (tab) {
                 MainTab.HOME -> HomeScreen(
-                    onCreateList = onCreateList,
+                    onCreateList = { onCreateList(null) },
                     onOpenList = onOpenList,
                     onOpenVoice = onOpenVoice,
                     onOpenProfile = { tab = MainTab.PROFILE },
                     showFab = false
                 )
-                MainTab.CATEGORIES -> CategoriesScreen(onStartList = onCreateList)
+                MainTab.CATEGORIES -> CategoriesScreen(onStartList = { categoryId -> onCreateList(categoryId) })
                 MainTab.LISTS -> HomeScreen(
-                    onCreateList = onCreateList,
+                    onCreateList = { onCreateList(null) },
                     onOpenList = onOpenList,
                     onOpenVoice = onOpenVoice,
                     onOpenProfile = { tab = MainTab.PROFILE },
@@ -117,7 +117,7 @@ fun MainShell(
 /** Categories tab: browse the catalog taxonomy; tapping a category starts a new list. */
 @Composable
 fun CategoriesScreen(
-    onStartList: () -> Unit,
+    onStartList: (String) -> Unit,
     viewModel: CategoriesViewModel = koinViewModel()
 ) {
     val categories by viewModel.categories.collectAsState()
@@ -132,7 +132,7 @@ fun CategoriesScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(categories, key = { it.categoryId }) { category ->
-                ElevatedCard(onClick = onStartList) {
+                ElevatedCard(onClick = { onStartList(category.categoryId) }) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally

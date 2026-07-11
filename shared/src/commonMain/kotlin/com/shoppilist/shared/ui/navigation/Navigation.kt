@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.savedstate.read
 import com.shoppilist.shared.domain.CountryLanguageData
 import com.shoppilist.shared.presentation.StartDestination
@@ -26,7 +28,11 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object ProfileSetup : Screen("profile_setup")
     object Home : Screen("home")
-    object CreateList : Screen("create_list")
+    object CreateList : Screen("create_list?categoryId={categoryId}") {
+        // Optional categoryId → the pick-items list auto-scrolls to that category on open.
+        fun createRoute(categoryId: String? = null) =
+            if (categoryId != null) "create_list?categoryId=$categoryId" else "create_list"
+    }
     object ListDetail : Screen("list_detail/{listId}") {
         fun createRoute(listId: String) = "list_detail/$listId"
     }
@@ -100,15 +106,24 @@ fun AppNavigation(startScreen: String = Screen.Splash.route) {
         }
         composable(Screen.Home.route) {
             MainShell(
-                onCreateList = { navController.navigate(Screen.CreateList.route) },
+                onCreateList = { categoryId -> navController.navigate(Screen.CreateList.createRoute(categoryId)) },
                 onOpenList = { listId -> navController.navigate(Screen.ListDetail.createRoute(listId)) },
                 onOpenVoice = { navController.navigate(Screen.Voice.route) },
                 onOpenAdmin = { navController.navigate(Screen.AdminDashboard.route) },
                 onLoggedOut = { navController.navigate(Screen.Login.route) { popUpTo(0) } }
             )
         }
-        composable(Screen.CreateList.route) {
+        composable(
+            Screen.CreateList.route,
+            arguments = listOf(navArgument("categoryId") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            })
+        ) { backStackEntry ->
+            val categoryId = backStackEntry.arguments?.read { getStringOrNull("categoryId") }
             CreateListScreen(
+                initialCategoryId = categoryId,
                 onBack = { navController.popBackStack() },
                 onCreated = { listId ->
                     // Land inside the new list; Home stays beneath it on the back stack.

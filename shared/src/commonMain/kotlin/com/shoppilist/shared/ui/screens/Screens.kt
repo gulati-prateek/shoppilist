@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -460,14 +461,28 @@ fun AddressForm(
     }
 
     val currentCountry = com.shoppilist.shared.domain.CountryLanguageData.countries.find { it.code == country }
-    OutlinedTextField(
-        value = currentCountry?.let { "${it.flag} ${it.name}" } ?: "",
-        onValueChange = {},
-        readOnly = true,
-        label = { Text("Country") },
-        placeholder = { Text("Select country") },
-        modifier = Modifier.fillMaxWidth().clickable { showCountryPicker = true }
-    )
+    // A read-only text field ignores taps on its own; disable it and overlay a clickable Box so the
+    // whole field reliably opens the country dialog (keeps the enabled look via colour overrides).
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = currentCountry?.let { "${it.flag} ${it.name}" } ?: "",
+            onValueChange = {},
+            readOnly = true,
+            enabled = false,
+            label = { Text("Country") },
+            placeholder = { Text("Select country") },
+            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(modifier = Modifier.matchParentSize().clickable { showCountryPicker = true })
+    }
     if (showCountryPicker) {
         Dialog(onDismissRequest = { showCountryPicker = false }) {
             Card {

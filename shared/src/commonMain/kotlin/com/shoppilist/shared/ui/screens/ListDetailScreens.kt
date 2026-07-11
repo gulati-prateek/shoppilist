@@ -18,11 +18,13 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.coroutines.launch
 import com.shoppilist.shared.currentTimeMillis
 import com.shoppilist.shared.data.local.ItemCategoryEntity
 import com.shoppilist.shared.data.local.ListMemberEntity
@@ -116,6 +119,7 @@ fun ListDetailScreen(
     var assigneeTargetItem by remember { mutableStateOf<ShoppingItemEntity?>(null) }
     var editTargetItem by remember { mutableStateOf<ShoppingItemEntity?>(null) }
     var showCatalogPicker by remember { mutableStateOf(false) }
+    var showModeInfo by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var currentUserName by remember { mutableStateOf("You") }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -288,25 +292,29 @@ fun ListDetailScreen(
             }
 
             val modes = ListViewMode.entries.toList()
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                modes.forEachIndexed { index, mode ->
-                    SegmentedButton(
-                        selected = viewMode == mode,
-                        onClick = { viewMode = mode },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
-                    ) {
-                        Text(
-                            when (mode) {
-                                ListViewMode.LIST -> "List"
-                                ListViewMode.AISLE -> "Aisle"
-                                ListViewMode.MY_ITEMS -> "My Items"
-                            }
-                        )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                    modes.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            selected = viewMode == mode,
+                            onClick = { viewMode = mode },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
+                        ) {
+                            Text(
+                                when (mode) {
+                                    ListViewMode.LIST -> "List"
+                                    ListViewMode.AISLE -> "Aisle"
+                                    ListViewMode.MY_ITEMS -> "My Items"
+                                }
+                            )
+                        }
                     }
+                }
+                IconButton(onClick = { showModeInfo = true }) {
+                    Icon(Icons.Outlined.Info, contentDescription = "What do these views mean?")
                 }
             }
 
@@ -500,6 +508,10 @@ fun ListDetailScreen(
                 assigneeTargetItem = editItem
                 editTargetItem = null
             },
+            onRemove = {
+                viewModel.deleteItem(editItem.itemId)
+                editTargetItem = null
+            },
             onDismiss = { editTargetItem = null }
         )
     }
@@ -514,6 +526,31 @@ fun ListDetailScreen(
             onAdd = { name -> viewModel.addItem(listId, name) },
             onDismiss = { showCatalogPicker = false }
         )
+    }
+
+    if (showModeInfo) {
+        AlertDialog(
+            onDismissRequest = { showModeInfo = false },
+            title = { Text("List views") },
+            text = {
+                Column {
+                    ModeInfoLine("List", "Your items split into To Get and In Cart, grouped by category.")
+                    Spacer(Modifier.height(8.dp))
+                    ModeInfoLine("Aisle", "Every item grouped by store aisle (category) in aisle order, so you shop row by row.")
+                    Spacer(Modifier.height(8.dp))
+                    ModeInfoLine("My Items", "Only the items assigned to you.")
+                }
+            },
+            confirmButton = { TextButton(onClick = { showModeInfo = false }) { Text("Got it") } }
+        )
+    }
+}
+
+@Composable
+private fun ModeInfoLine(title: String, description: String) {
+    Column {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Text(description, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -530,11 +567,25 @@ private fun CatalogPickerSheet(
     var addedThisSession by remember { mutableStateOf(setOf<String>()) }
     var search by remember { mutableStateOf("") }
     val query = search.trim().lowercase()
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     val visibleFrequent = if (query.isEmpty()) frequentItems else frequentItems.filter { it.contains(query) }
     val visibleSections = sections.mapNotNull { section ->
         val visible = if (query.isEmpty()) section.itemNames else section.itemNames.filter { it.contains(query) }
         if (visible.isNotEmpty()) section to visible else null
+    }
+
+    // Flat LazyColumn index of a category header, mirroring the render order below, so a chip tap
+    // scrolls the item list straight to that category.
+    fun indexOfCategory(categoryId: String): Int {
+        var idx = 0
+        if (visibleFrequent.isNotEmpty()) idx += 1 + visibleFrequent.size
+        for ((section, visible) in visibleSections) {
+            if (section.category.categoryId == categoryId) return idx
+            idx += 1 + visible.size
+        }
+        return idx
     }
 
     fun addName(name: String) {
@@ -563,10 +614,27 @@ private fun CatalogPickerSheet(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
                 Spacer(Modifier.height(8.dp))
+                // Category quick-jump chips → scroll the item list to that category.
+                if (visibleSections.isNotEmpty()) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(visibleSections, key = { it.first.category.categoryId }) { (section, _) ->
+                            AssistChip(
+                                onClick = {
+                                    scope.launch { listState.animateScrollToItem(indexOfCategory(section.category.categoryId)) }
+                                },
+                                label = { Text("${section.category.emoji} ${section.category.name}") }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
                 if (loading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                     if (visibleFrequent.isNotEmpty()) {
                         item(key = "cat-frequent-header") { CatalogPickerHeader("⭐", "Frequently Added") }
                         items(visibleFrequent, key = { "cat-frequent-$it" }) { name ->
@@ -654,6 +722,7 @@ private fun EditItemDialog(
     item: ShoppingItemEntity,
     onSave: (Double, String?, String?) -> Unit,
     onAssign: () -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var quantity by remember(item.itemId) { mutableStateOf(formatQty(item.quantity)) }
@@ -695,6 +764,14 @@ private fun EditItemDialog(
                     Icon(Icons.Default.PersonAdd, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Assign to person")
+                }
+                TextButton(
+                    onClick = onRemove,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remove from list")
                 }
             }
         },

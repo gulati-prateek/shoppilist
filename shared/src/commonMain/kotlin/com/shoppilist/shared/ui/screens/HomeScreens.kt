@@ -484,6 +484,7 @@ private fun CollaboratorAvatars(meta: ListMeta?) {
 @Composable
 fun CreateListScreen(
     viewModel: CreateListViewModel = koinViewModel(),
+    initialCategoryId: String? = null,
     onBack: () -> Unit,
     onCreated: (listId: String) -> Unit
 ) {
@@ -494,13 +495,17 @@ fun CreateListScreen(
     }
 
     when (state.step) {
-        CreateListStep.PICK_ITEMS -> PickItemsStep(viewModel, onBack)
+        CreateListStep.PICK_ITEMS -> PickItemsStep(viewModel, onBack, initialCategoryId)
         CreateListStep.NAME -> NameListStep(viewModel)
     }
 }
 
 @Composable
-private fun PickItemsStep(viewModel: CreateListViewModel, onBack: () -> Unit) {
+private fun PickItemsStep(
+    viewModel: CreateListViewModel,
+    onBack: () -> Unit,
+    initialCategoryId: String? = null
+) {
     val state by viewModel.state.collectAsState()
     var search by remember { mutableStateOf("") }
     var customName by remember { mutableStateOf("") }
@@ -532,6 +537,16 @@ private fun PickItemsStep(viewModel: CreateListViewModel, onBack: () -> Unit) {
             idx += 1 + visible.size
         }
         return idx
+    }
+
+    // Arrived from the Categories tab with a target category → scroll to it once the catalog loads.
+    var didAutoScroll by remember { mutableStateOf(false) }
+    LaunchedEffect(initialCategoryId, visibleSections.size) {
+        if (!didAutoScroll && initialCategoryId != null &&
+            visibleSections.any { it.first.category.categoryId == initialCategoryId }) {
+            listState.animateScrollToItem(indexOfCategory(initialCategoryId))
+            didAutoScroll = true
+        }
     }
 
     Column(
